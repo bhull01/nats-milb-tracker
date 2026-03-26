@@ -565,20 +565,33 @@ def rolling_pitching(conn: Connection, player_name: str,
 
 def last_n_games_hitting(conn: Connection, player_name: str,
                          n: int = 15, year: int | None = None) -> dict | None:
-    year_filter = f"AND date LIKE '{year}-%'" if year else ""
-    row = conn.execute(_q(f"""
-        SELECT
-            COUNT(*) as games,
-            SUM(ab) as ab, SUM(h) as h, SUM(hr) as hr,
-            SUM(doubles) as doubles, SUM(triples) as triples,
-            SUM(rbi) as rbi, SUM(bb) as bb, SUM(k) as k, SUM(sb) as sb
-        FROM (
-            SELECT * FROM hitting_lines
-            WHERE player_name = ? {year_filter}
-            ORDER BY date DESC
-            LIMIT ?
-        ) sub
-    """), (player_name, n)).fetchone()
+    if year:
+        sql = _q("""
+            SELECT COUNT(*) as games,
+                SUM(ab) as ab, SUM(h) as h, SUM(hr) as hr,
+                SUM(doubles) as doubles, SUM(triples) as triples,
+                SUM(rbi) as rbi, SUM(bb) as bb, SUM(k) as k, SUM(sb) as sb
+            FROM (
+                SELECT * FROM hitting_lines
+                WHERE player_name = ? AND date LIKE ?
+                ORDER BY date DESC LIMIT ?
+            ) sub
+        """)
+        params = (player_name, f"{year}-%", n)
+    else:
+        sql = _q("""
+            SELECT COUNT(*) as games,
+                SUM(ab) as ab, SUM(h) as h, SUM(hr) as hr,
+                SUM(doubles) as doubles, SUM(triples) as triples,
+                SUM(rbi) as rbi, SUM(bb) as bb, SUM(k) as k, SUM(sb) as sb
+            FROM (
+                SELECT * FROM hitting_lines
+                WHERE player_name = ?
+                ORDER BY date DESC LIMIT ?
+            ) sub
+        """)
+        params = (player_name, n)
+    row = conn.execute(sql, params).fetchone()
     if not row or not row["ab"]:
         return None
     d = dict(row)
@@ -592,19 +605,31 @@ def last_n_games_hitting(conn: Connection, player_name: str,
 
 def last_n_games_pitching(conn: Connection, player_name: str,
                            n: int = 15, year: int | None = None) -> dict | None:
-    year_filter = f"AND date LIKE '{year}-%'" if year else ""
-    row = conn.execute(_q(f"""
-        SELECT
-            COUNT(*) as games,
-            SUM(ip) as ip, SUM(er) as er, SUM(k) as k,
-            SUM(bb) as bb, SUM(h) as h, SUM(hr) as hr
-        FROM (
-            SELECT * FROM pitching_lines
-            WHERE player_name = ? {year_filter}
-            ORDER BY date DESC
-            LIMIT ?
-        ) sub
-    """), (player_name, n)).fetchone()
+    if year:
+        sql = _q("""
+            SELECT COUNT(*) as games,
+                SUM(ip) as ip, SUM(er) as er, SUM(k) as k,
+                SUM(bb) as bb, SUM(h) as h, SUM(hr) as hr
+            FROM (
+                SELECT * FROM pitching_lines
+                WHERE player_name = ? AND date LIKE ?
+                ORDER BY date DESC LIMIT ?
+            ) sub
+        """)
+        params = (player_name, f"{year}-%", n)
+    else:
+        sql = _q("""
+            SELECT COUNT(*) as games,
+                SUM(ip) as ip, SUM(er) as er, SUM(k) as k,
+                SUM(bb) as bb, SUM(h) as h, SUM(hr) as hr
+            FROM (
+                SELECT * FROM pitching_lines
+                WHERE player_name = ?
+                ORDER BY date DESC LIMIT ?
+            ) sub
+        """)
+        params = (player_name, n)
+    row = conn.execute(sql, params).fetchone()
     if not row or not row["ip"]:
         return None
     d = dict(row)
