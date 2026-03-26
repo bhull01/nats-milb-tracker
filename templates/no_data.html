@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}No Data Yet{% endblock %}
+{% block content %}
+<div style="text-align:center; padding:60px 20px;">
+    <h1 style="color:#14225A;">No Game Data Yet</h1>
+    <p style="color:#586069; margin-top:12px;">
+        The database is empty. Run <code>python3 nats_tracker.py fetch</code> to pull in game data,
+        or wait for the data migration to complete.
+    </p>
+</div>
+{% endblock %}
