@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nats MiLB Tracker – 2026-04-15</title>
+<style>
+:root {
+    --nats-red: #AB0003; --nats-navy: #14225A; --nats-gold: #C4A049;
+    --bg: #f4f5f7; --card-bg: #fff; --border: #e1e4e8;
+    --text: #24292e; --muted: #586069;
+    --green-light: #e6ffed; --red-light: #ffeef0;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+       background:var(--bg); color:var(--text); line-height:1.5; }
+.header { background:linear-gradient(135deg,var(--nats-navy),#1a2d6d);
+           color:#fff; padding:20px 32px; text-align:center; }
+.header h1 { font-size:26px; font-weight:700; }
+.header .date { font-size:15px; opacity:.85; margin-top:2px; }
+.header .curly-w { font-size:38px; color:var(--nats-red);
+                    text-shadow:0 0 20px rgba(171,0,3,.5); }
+.nav { display:flex; justify-content:center; align-items:center; gap:12px;
+        padding:12px; background:#fff; border-bottom:1px solid var(--border); }
+.nav-btn { padding:6px 14px; border-radius:6px; text-decoration:none;
+            font-size:13px; font-weight:600; border:1px solid var(--border);
+            color:var(--nats-navy); background:#fff; cursor:pointer; }
+.nav-btn:hover { background:var(--green-light); }
+.nav-btn.disabled { opacity:.4; cursor:default; }
+.nav select { padding:5px 8px; border-radius:6px; border:1px solid var(--border);
+               font-size:13px; }
+.container { max-width:1300px; margin:0 auto; padding:20px 16px; }
+.key-performers { background:var(--card-bg); border:2px solid var(--nats-red);
+                   border-radius:12px; padding:18px 22px; margin-bottom:22px; }
+.key-performers h2 { color:var(--nats-red); font-size:18px; margin-bottom:14px; }
+.key-performers h2::before { content:"\2B50 "; }
+.performer-card { display:flex; align-items:center; gap:14px;
+                   padding:8px 12px; border-radius:8px; margin-bottom:6px;
+                   background:#fafbfc; border:1px solid var(--border); }
+.performer-card:hover { background:var(--green-light); }
+.performer-rank { min-width:80px; }
+.performer-info { flex:1; }
+.performer-name { font-weight:600; font-size:14px; }
+.performer-team { font-size:11px; color:var(--muted); }
+.performer-line { font-family:'SF Mono',Menlo,monospace; font-size:12px;
+                   color:var(--nats-navy); font-weight:600; white-space:nowrap; }
+.affiliate-section { background:var(--card-bg); border-radius:12px;
+                      padding:18px 22px; margin-bottom:18px;
+                      border:1px solid var(--border);
+                      box-shadow:0 1px 3px rgba(0,0,0,.04); }
+.affiliate-header h2 { font-size:16px; display:flex; align-items:center;
+                        gap:8px; flex-wrap:wrap; }
+.level-badge { background:var(--nats-navy); color:#fff; padding:2px 8px;
+               border-radius:5px; font-size:11px; font-weight:600;
+               text-transform:uppercase; letter-spacing:.5px; }
+.result-badge { padding:2px 8px; border-radius:5px; font-size:13px; font-weight:700; }
+.result-win { background:var(--green-light); color:#22863a; }
+.result-loss { background:var(--red-light); color:#cb2431; }
+.result-pending { background:#fff8e1; color:#856404; }
+.record { font-size:13px; color:var(--muted); font-weight:400; }
+.no-game { font-size:14px; color:var(--muted); font-weight:400; }
+h3 { font-size:13px; color:var(--muted); text-transform:uppercase;
+      letter-spacing:.5px; margin:14px 0 6px; }
+.table-wrap { overflow-x:auto; }
+.stats-table { width:100%; border-collapse:collapse; font-size:12px; }
+.stats-table th { background:var(--nats-navy); color:#fff; padding:6px 8px;
+                   text-align:left; font-weight:600; font-size:10px;
+                   text-transform:uppercase; letter-spacing:.3px; white-space:nowrap; }
+.stats-table td { padding:5px 8px; border-bottom:1px solid var(--border);
+                   white-space:nowrap; }
+.stats-table tbody tr:hover { background:#f6f8fa; }
+.prospect-row { background:#fffde7 !important; }
+.prospect-row:hover { background:#fff9c4 !important; }
+.rank-cluster { display:inline-flex; gap:2px; vertical-align:middle; }
+.rank-pip { display:inline-block; color:#fff; padding:1px 5px;
+            border-radius:3px; font-size:9px; font-weight:700;
+            min-width:18px; text-align:center; }
+.rank-na { background:#ccc !important; }
+.rank-legend { font-size:12px; color:var(--muted); margin-bottom:12px; }
+.rank-legend .rank-pip { font-size:9px; vertical-align:middle; }
+.trend-up { color:#22863a; font-weight:700; }
+.trend-down { color:#cb2431; font-weight:700; }
+.trend-flat { color:#6a737d; font-size:10px; }
+.prospect-tracker { background:var(--card-bg); border:2px solid var(--nats-gold);
+                     border-radius:12px; padding:18px 22px; margin-top:22px; }
+.prospect-tracker h2 { color:var(--nats-navy); font-size:18px; margin-bottom:8px; }
+.no-data { color:var(--muted); font-style:italic; padding:10px 0; }
+.footer { text-align:center; padding:20px; color:var(--muted); font-size:11px; }
+@media(max-width:768px) {
+    .header { padding:14px; }
+    .header h1 { font-size:18px; }
+    .container { padding:10px 6px; }
+    .performer-card { flex-direction:column; gap:4px; text-align:center; }
+}
+</style>
+</head>
+<body>
+<div class="header">
+    <div class="curly-w">W</div>
+    <h1>Nationals Minor League Tracker</h1>
+    <div class="date">Wednesday, April 15, 2026</div>
+</div>
+<div class="nav">
+    <a href="nats_dashboard.html?date=2026-04-14" class="nav-btn" onclick="return false;">&#9664; 2026-04-14</a>
+    <select id="date-picker" onchange="alert('Regenerate dashboard for ' + this.value + ' with: python3 nats_tracker.py dashboard ' + this.value)">
+        <option value="2026-04-15" selected>2026-04-15</option>
+<option value="2026-04-14" >2026-04-14</option>
+<option value="2026-04-13" >2026-04-13</option>
+    </select>
+    <span class="nav-btn disabled">Next &#9654;</span>
+</div>
+<div class="container">
+    <div class="key-performers">
+        <h2>Key Performers</h2>
+        
+        <div class="performer-card">
+            <div class="performer-rank"><span class="rank-cluster"><span class="rank-pip" style="background:#AB0003" title="MLB Pipeline #15">15</span> <span class="rank-pip" style="background:#1a7a3a" title="FG Pipeline #16">16</span> <span class="rank-pip" style="background:#14225A" title="BA Pipeline #15">15</span></span></div>
+            <div class="performer-info">
+                <div class="performer-name">Yoel Tejeda Jr.</div>
+                <div class="performer-team">High-A – Wilmington Blue Rocks</div>
+            </div>
+            <div class="performer-line">6.0 IP, 9 K, 1 ER</div>
+        </div>
+        <div class="performer-card">
+            <div class="performer-rank"><span class="rank-cluster"><span class="rank-pip" style="background:#AB0003" title="MLB Pipeline #9">9</span> <span class="rank-pip" style="background:#1a7a3a" title="FG Pipeline #8">8</span> <span class="rank-pip" style="background:#14225A" title="BA Pipeline #9">9</span></span></div>
+            <div class="performer-info">
+                <div class="performer-name">Landon Harmon</div>
+                <div class="performer-team">Single-A – Fredericksburg Nationals</div>
+            </div>
+            <div class="performer-line">4.7 IP, 8 K, 0 ER</div>
+        </div>
+        <div class="performer-card">
+            <div class="performer-rank"><span class="rank-cluster"><span class="rank-pip" style="background:#AB0003" title="MLB Pipeline #8">8</span> <span class="rank-pip" style="background:#1a7a3a" title="FG Pipeline #5">5</span> <span class="rank-pip" style="background:#14225A" title="BA Pipeline #6">6</span></span></div>
+            <div class="performer-info">
+                <div class="performer-name">Alex Clemmey</div>
+                <div class="performer-team">AA – Harrisburg Senators</div>
+            </div>
+            <div class="performer-line">6.8 IP, 5 K, 1 ER</div>
+        </div>
+        <div class="performer-card">
+            <div class="performer-rank"><span class="rank-cluster"><span class="rank-pip" style="background:#AB0003" title="MLB Pipeline #28">28</span> <span class="rank-pip" style="background:#1a7a3a" title="FG Pipeline #27">27</span> <span class="rank-pip" style="background:#14225A" title="BA Pipeline #28">28</span></span></div>
+            <div class="performer-info">
+                <div class="performer-name">Caleb Lomavita</div>
+                <div class="performer-team">High-A – Wilmington Blue Rocks</div>
+            </div>
+            <div class="performer-line">3-3, 1 HR, 3 RBI, 1 2B, 1 SB, 2 R</div>
+        </div>
+        <div class="performer-card">
+            <div class="performer-rank"><span class="rank-cluster"><span class="rank-pip" style="background:#AB0003" title="MLB Pipeline #20">20</span> <span class="rank-pip" style="background:#1a7a3a" title="FG Pipeline #17">17</span> <span class="rank-pip" style="background:#14225A" title="BA Pipeline #18">18</span></span></div>
+            <div class="performer-info">
+                <div class="performer-name">Yeremy Cabrera</div>
+                <div class="performer-team">Single-A – Fredericksburg Nationals</div>
+            </div>
+            <div class="performer-line">3-3, 1 HR, 1 2B, 1 BB, 1 SB, 2 R</div>
+        </div>
+        <div class="performer-card">
+            <div class="performer-rank"><span class="rank-cluster"><span class="rank-pip" style="background:#AB0003" title="MLB Pipeline #3">3</span> <span class="rank-pip" style="background:#1a7a3a" title="FG Pipeline #3">3</span> <span class="rank-pip" style="background:#14225A" title="BA Pipeline #4">4</span></span></div>
+            <div class="performer-info">
+                <div class="performer-name">Harry Ford</div>
+                <div class="performer-team">AAA – Rochester Red Wings</div>
+            </div>
+            <div class="performer-line">4-5, 1 HR, 1 SB, 1 R</div>
+        </div>
+        <div class="performer-card">
+            <div class="performer-rank"><span class="rank-cluster"><span class="rank-pip" style="background:#AB0003" title="MLB Pipeline #14">14</span> <span class="rank-pip" style="background:#1a7a3a" title="FG Pipeline #13">13</span> <span class="rank-pip" style="background:#14225A" title="BA Pipeline #13">13</span></span></div>
+            <div class="performer-info">
+                <div class="performer-name">Jackson Kent</div>
+                <div class="performer-team">AA – Harrisburg Senators</div>
+            </div>
+            <div class="performer-line">6.9 IP, 5 K, 3 ER (L, 2-3)</div>
+        </div>
+        <div class="performer-card">
+            <div class="performer-rank"><span class="rank-cluster"><span class="rank-pip" style="background:#AB0003" title="MLB Pipeline #4">4</span> <span class="rank-pip" style="background:#1a7a3a" title="FG Pipeline #2">2</span> <span class="rank-pip" style="background:#14225A" title="BA Pipeline #3">3</span></span></div>
+            <div class="performer-info">
+                <div class="performer-name">Jarlin Susana</div>
+                <div class="performer-team">AA – Harrisburg Senators</div>
+            </div>
+            <div class="performer-line">1-3, 1 HR, 3 RBI, 2 BB, 1 SB, 1 R</div>
+        </div>
+        <div class="performer-card">
+            <div class="performer-rank"><span class="rank-cluster"><span class="rank-pip" style="background:#AB0003" title="MLB Pipeline #11">11</span> <span class="rank-pip" style="background:#1a7a3a" title="FG Pipeline #10">10</span> <span class="rank-pip" style="background:#14225A" title="BA Pipeline #12">12</span></span></div>
+            <div class="performer-info">
+                <div class="performer-name">Coy James</div>
+                <div class="performer-team">Single-A – Fredericksburg Nationals</div>
+            </div>
+            <div class="performer-line">4-5, 2 RBI, 1 2B, 1 R</div>
+        </div>
+        <div class="performer-card">
+            <div class="performer-rank"><span class="rank-cluster"><span class="rank-pip" style="background:#AB0003" title="MLB Pipeline #27">27</span> <span class="rank-pip" style="background:#1a7a3a" title="FG Pipeline #28">28</span> <span class="rank-pip" style="background:#14225A" title="BA Pipeline #26">26</span></span></div>
+            <div class="performer-info">
+                <div class="performer-name">Sean Paul Linan</div>
+                <div class="performer-team">AAA – Rochester Red Wings</div>
+            </div>
+            <div class="performer-line">3.8 IP, 8 K, 2 ER (L, 2-3)</div>
+        </div>
+    </div>
+    
+            <div class="affiliate-section">
+                <div class="affiliate-header">
+                    <h2><span class="level-badge">AAA</span> Rochester Red Wings @ Lehigh Valley IronPigs — <span class="result-badge result-win">W 7-3</span> <span class="record">(2-1)</span></h2>
+                </div>
+                <h3>Hitting</h3>
+            <div class="table-wrap"><table class="stats-table">
+            <thead><tr><th>Name</th><th>Pos</th><th>AB</th><th>R</th><th>H</th>
+            <th>2B</th><th>3B</th><th>HR</th><th>RBI</th><th>BB</th><th>K</th>
+            <th>SB</th><th>AVG</th></tr></thead>
+            <tbody><tr class="prospect-row">
+                    <td><span class="rank-cluster"><span class="rank-pip" style="background:#AB0003" title="MLB Pipeline #3">3</span> <span class="rank-pip" style="background:#1a7a3a" title="FG Pipeline #3">3</span> <span class="rank-pip" style="background:#14225A" title="BA Pipeline #4">4</span></span> Harry Ford</td><td>C</td>
+                    <td>5</td><td>1</td><td>4</td>
+                    <td>0</td><td>0</td><td>1</td>
+                    <td>0</td><td>0</td><td>3</td>
+                    <td>1</td><td>0.800</td>
+                </tr><tr>
+                    <td>John Doe</td><td>1B</td>
+                    <td>5</td><td>2</td><td>3</td>
+                    <td>0</td><td>0</td><td>1</td>
+                    <td>1</td><td>0</td><td>2</td>
+                    <td>0</td><td>0.600</td>
+                </tr><tr>
+                    <td>Tom Brown</td><td>DH</td>
+                    <td>5</td><td>1</td><td>3</td>
+                    <td>0</td><td>0</td><td>0</td>
+                    <td>1</td><td>1</td><td>0</td>
+                    <td>0</td><td>0.600</td>
+                </tr><tr>
+                    <td>Jake Wilson</td><td>2B</td>
+                    <td>4</td><td>2</td><td>1</td>
+                    <td>0</td><td>0</td><td>0</td>
+                    <td>1</td><td>1</td><td>2</td>
+                    <td>0</td><td>0.250</td>
+                </tr><tr>
+                    <td>Mike Smith</td><td>LF</td>
+                    <td>3</td><td>1</td><td>2</td>
+                    <td>1</td><td>0</td><td>0</td>
+                    <td>0</td><td>0</td><td>1</td>
+                    <td>0</td><td>0.667</td>
+                </tr><tr class="prospect-row">
+                    <td><span class="rank-cluster"><span class="rank-pip" style="background:#AB0003" title="MLB Pipeline #18">18</span> <span class="rank-pip" style="background:#1a7a3a" title="FG Pipeline #18">18</span> <span class="rank-pip" style="background:#14225A" title="BA Pipeline #20">20</span></span> Christian Franklin</td><td>CF</td>
+                    <td>3</td><td>0</td><td>1</td>
+                    <td>0</td><td>0</td><td>1</td>
+                    <td>0</td><td>1</td><td>2</td>
+                    <td>1</td><td>0.333</td>
+                </tr><tr class="prospect-row">
+                    <td><span class="rank-cluster"><span class="rank-pip" style="background:#AB0003" title="MLB Pipeline #19">19</span> <span class="rank-pip" style="background:#1a7a3a" title="FG Pipeline #20">20</span> <span class="rank-pip" style="background:#14225A" title="BA Pipeline #19">19</span></span> Andrew Pinckney</td><td>RF</td>
+                    <td>3</td><td>1</td><td>0</td>
+                    <td>0</td><td>0</td><td>0</td>
+                    <td>2</td><td>0</td><td>1</td>
+                    <td>1</td><td>.000</td>
+                </tr></tbody></table></div><h3>Pitching</h3>
+            <div class="table-wrap"><table class="stats-table">
+            <thead><tr><th>Name</th><th>Pos</th><th>IP</th><th>H</th><th>R</th>
+            <th>ER</th><th>BB</th><th>K</th><th>Dec</th></tr></thead>
+            <tbody><tr class="prospect-row">
+                    <td><span class="rank-cluster"><span class="rank-pip" style="background:#AB0003" title="MLB Pipeline #6">6</span> <span class="rank-pip" style="background:#1a7a3a" title="FG Pipeline #6">6</span> <span class="rank-pip" style="background:#14225A" title="BA Pipeline #8">8</span></span> Luis Perales</td><td>P</td>
+                    <td>4.6</td><td>2</td><td>2</td>
+                    <td>0</td><td>4</td><td>2</td>
+                    <td></td>
+                </tr><tr class="prospect-row">
+                    <td><span class="rank-cluster"><span class="rank-pip" style="background:#AB0003" title="MLB Pipeline #27">27</span> <span class="rank-pip" style="background:#1a7a3a" title="FG Pipeline #28">28</span> <span class="rank-pip" style="background:#14225A" title="BA Pipeline #26">26</span></span> Sean Paul Linan</td><td>P</td>
+                    <td>3.8</td><td>3</td><td>4</td>
+                    <td>2</td><td>0</td><td>8</td>
+                    <td>(L, 2-3)</td>
+                </tr><tr>
+                    <td>Generic Reliever</td><td>P</td>
+                    <td>1.4</td><td>3</td><td>2</td>
+                    <td>2</td><td>0</td><td>3</td>
+                    <td></td>
+                </tr></tbody></table></div>
+            </div>
+            <div class="affiliate-section">
+                <div class="affiliate-header">
+                    <h2><span class="level-badge">AA</span> Harrisburg Senators vs Akron RubberDucks — <span class="result-badge result-loss">L 1-4</span> <span class="record">(1-2)</span></h2>
+                </div>
+                <h3>Hitting</h3>
+            <div class="table-wrap"><table class="stats-table">
+            <thead><tr><th>Name</th><th>Pos</th><th>AB</th><th>R</th><th>H</th>
+            <th>2B</th><th>3B</th><th>HR</th><th>RBI</th><th>BB</th><th>K</th>
+            <th>SB</th><th>AVG</th></tr></thead>
+            <tbody><tr class="prospect-row">
+                    <td><span class="rank-cluster"><span class="rank-pip" style="background:#AB0003" title="MLB Pipeline #30">30</span> <span class="rank-pip" style="background:#1a7a3a" title="FG Pipeline #30">30</span> <span class="rank-pip" style="background:#14225A" title="BA Pipeline #29">29</span></span> Brady House</td><td>SS</td>
+                    <td>5</td><td>2</td><td>3</td>
+                    <td>0</td><td>0</td><td>0</td>
+                    <td>3</td><td>0</td><td>3</td>
+                    <td>1</td><td>0.600</td>
+                </tr><tr>
+                    <td>Tom Brown</td><td>DH</td>
+                    <td>5</td><td>2</td><td>3</td>
+                    <td>1</td><td>0</td><td>0</td>
+                    <td>2</td><td>2</td><td>2</td>
+                    <td>0</td><td>0.600</td>
+                </tr><tr class="prospect-row">
+                    <td><span class="rank-cluster"><span class="rank-pip" style="background:#AB0003" title="MLB Pipeline #29">29</span> <span class="rank-pip" style="background:#1a7a3a" title="FG Pipeline #29">29</span> <span class="rank-pip" style="background:#14225A" title="BA Pipeline #30">30</span></span> Yohandy Morales</td><td>3B</td>
+                    <td>5</td><td>0</td><td>2</td>
+                    <td>0</td><td>0</td><td>0</td>
+                    <td>0</td><td>2</td><td>2</td>
+                    <td>1</td><td>0.400</td>
+                </tr><tr class="prospect-row">
+                    <td><span class="rank-cluster"><span class="rank-pip" style="background:#AB0003" title="MLB Pipeline #22">22</span> <span class="rank-pip" style="background:#1a7a3a" title="FG Pipeline #21">21</span> <span class="rank-pip" style="background:#14225A" title="BA Pipeline #23">23</span></span> Sam Petersen</td><td>LF</td>
+                    <td>5</td><td>2</td><td>1</td>
+                    <td>0</td><td>0</td><td>1</td>
+                    <td>2</td><td>1</td><td>3</td>
+                    <td>0</td><td>0.200</td>
+                </tr><tr>
+                    <td>Mike Smith</td><td>LF</td>
+                    <td>5</td><td>1</td><td>0</td>
+                    <td>1</td><td>0</td><td>0</td>
+                    <td>1</td><td>2</td><td>1</td>
+                    <td>0</td><td>.000</td>
+                </tr><tr>
+                    <td>John Doe</td><td>1B</td>
+                    <td>4</td><td>1</td><td>2</td>
+                    <td>0</td><td>0</td><td>0</td>
+                    <td>0</td><td>1</td><td>0</td>
+                    <td>0</td><td>0.500</td>
+                </tr><tr>
+                    <td>Jake Wilson</td><td>2B</td>
+                    <td>3</td><td>0</td><td>1</td>
+                    <td>1</td><td>0</td><td>0</td>
+                    <td>2</td><td>0</td><td>2</td>
+                    <td>0</td><td>0.333</td>
+                </tr><tr class="prospect-row">
+                    <td><span class="rank-cluster"><span class="rank-pip" style="background:#AB0003" title="MLB Pipeline #4">4</span> <span class="rank-pip" style="background:#1a7a3a" title="FG Pipeline #2">2</span> <span class="rank-pip" style="background:#14225A" title="BA Pipeline #3">3</span></span> Jarlin Susana</td><td>RHP</td>
+                    <td>3</td><td>1</td><td>1</td>
+                    <td>0</td><td>0</td><td>1</td>
+                    <td>3</td><td>2</td><td>3</td>
+                    <td>1</td><td>0.333</td>
+                </tr></tbody></table></div><h3>Pitching</h3>
+            <div class="table-wrap"><table class="stats-table">
+            <thead><tr><th>Name</th><th>Pos</th><th>IP</th><th>H</th><th>R</th>
+            <th>ER</th><th>BB</th><th>K</th><th>Dec</th></tr></thead>
+            <tbody><tr class="prospect-row">
+                    <td><span class="rank-cluster"><span class="rank-pip" style="background:#AB0003" title="MLB Pipeline #14">14</span> <span class="rank-pip" style="background:#1a7a3a" title="FG Pipeline #13">13</span> <span class="rank-pip" style="background:#14225A" title="BA Pipeline #13">13</span></span> Jackson Kent</td><td>P</td>
+                    <td>6.9</td><td>5</td><td>3</td>
+                    <td>3</td><td>3</td><td>5</td>
+                    <td>(L, 2-3)</td>
+                </tr><tr class="prospect-row">
+                    <td><span class="rank-cluster"><span class="rank-pip" style="background:#AB0003" title="MLB Pipeline #8">8</span> <span class="rank-pip" style="background:#1a7a3a" title="FG Pipeline #5">5</span> <span class="rank-pip" style="background:#14225A" title="BA Pipeline #6">6</span></span> Alex Clemmey</td><td>P</td>
+                    <td>6.8</td><td>3</td><td>3</td>
+                    <td>1</td><td>0</td><td>5</td>
+                    <td></td>
+                </tr><tr class="prospect-row">
+                    <td><span class="rank-cluster"><span class="rank-pip" style="background:#AB0003" title="MLB Pipeline #4">4</span> <span class="rank-pip" style="background:#1a7a3a" title="FG Pipeline #2">2</span> <span class="rank-pip" style="background:#14225A" title="BA Pipeline #3">3</span></span> Jarlin Susana</td><td>P</td>
+                    <td>5.9</td><td>4</td><td>5</td>
+                    <td>4</td><td>0</td><td>2</td>
+                    <td>(L, 2-3)</td>
+                </tr><tr>
+                    <td>Generic Reliever</td><td>P</td>
+                    <td>1.3</td><td>3</td><td>1</td>
+                    <td>2</td><td>1</td><td>3</td>
+                    <td></td>
+                </tr></tbody></table></div>
+            </div>
+            <div class="affiliate-section">
+                <div class="affiliate-header">
+                    <h2><span class="level-badge">High-A</span> Wilmington Blue Rocks vs Jersey Shore BlueClaws — <span class="result-badge result-win">W 6-2</span> <span class="record">(2-0)</span></h2>
+                </div>
+                <h3>Hitting</h3>
+            <div class="table-wrap"><table class="stats-table">
+            <thead><tr><th>Name</th><th>Pos</th><th>AB</th><th>R</th><th>H</th>
+            <th>2B</th><th>3B</th><th>HR</th><th>RBI</th><th>BB</th><th>K</th>
+            <th>SB</th><th>AVG</th></tr></thead>
+            <tbody><tr>
+                    <td>John Doe</td><td>1B</td>
+                    <td>4</td><td>1</td><td>2</td>
+                    <td>1</td><td>0</td><td>1</td>
+                    <td>2</td><td>1</td><td>2</td>
+                    <td>0</td><td>0.500</td>
+                </tr><tr>
+                    <td>Mike Smith</td><td>LF</td>
+                    <td>4</td><td>0</td><td>2</td>
+                    <td>0</td><td>0</td><td>0</td>
+                    <td>1</td><td>0</td><td>1</td>
+                    <td>0</td><td>0.500</td>
+                </tr><tr class="prospect-row">
+                    <td><span class="rank-cluster"><span class="rank-pip" style="background:#AB0003" title="MLB Pipeline #7">7</span> <span class="rank-pip" style="background:#1a7a3a" title="FG Pipeline #9">9</span> <span class="rank-pip" style="background:#14225A" title="BA Pipeline #7">7</span></span> Seaver King</td><td>SS</td>
+                    <td>4</td><td>2</td><td>0</td>
+                    <td>0</td><td>0</td><td>0</td>
+                    <td>1</td><td>2</td><td>0</td>
+                    <td>0</td><td>.000</td>
+                </tr><tr class="prospect-row">
+                    <td><span class="rank-cluster"><span class="rank-pip" style="background:#AB0003" title="MLB Pipeline #28">28</span> <span class="rank-pip" style="background:#1a7a3a" title="FG Pipeline #27">27</span> <span class="rank-pip" style="background:#14225A" title="BA Pipeline #28">28</span></span> Caleb Lomavita</td><td>C</td>
+                    <td>3</td><td>2</td><td>3</td>
+                    <td>1</td><td>0</td><td>1</td>
+                    <td>3</td><td>0</td><td>1</td>
+                    <td>1</td><td>1.000</td>
+                </tr><tr class="prospect-row">
+                    <td><span class="rank-cluster"><span class="rank-pip" style="background:#AB0003" title="MLB Pipeline #24">24</span> <span class="rank-pip" style="background:#1a7a3a" title="FG Pipeline #23">23</span> <span class="rank-pip" style="background:#14225A" title="BA Pipeline #24">24</span></span> Abimelec Ortiz</td><td>1B</td>
+                    <td>3</td><td>0</td><td>1</td>
+                    <td>0</td><td>0</td><td>0</td>
+                    <td>3</td><td>0</td><td>2</td>
+                    <td>1</td><td>0.333</td>
+                </tr><tr>
+                    <td>Jake Wilson</td><td>2B</td>
+                    <td>3</td><td>2</td><td>1</td>
+                    <td>1</td><td>0</td><td>1</td>
+                    <td>2</td><td>2</td><td>2</td>
+                    <td>0</td><td>0.333</td>
+                </tr><tr>
+                    <td>Tom Brown</td><td>DH</td>
+                    <td>3</td><td>1</td><td>1</td>
+                    <td>0</td><td>0</td><td>1</td>
+                    <td>0</td><td>1</td><td>0</td>
+                    <td>0</td><td>0.333</td>
+                </tr></tbody></table></div><h3>Pitching</h3>
+            <div class="table-wrap"><table class="stats-table">
+            <thead><tr><th>Name</th><th>Pos</th><th>IP</th><th>H</th><th>R</th>
+            <th>ER</th><th>BB</th><th>K</th><th>Dec</th></tr></thead>
+            <tbody><tr class="prospect-row">
+                    <td><span class="rank-cluster"><span class="rank-pip" style="background:#AB0003" title="MLB Pipeline #15">15</span> <span class="rank-pip" style="background:#1a7a3a" title="FG Pipeline #16">16</span> <span class="rank-pip" style="background:#14225A" title="BA Pipeline #15">15</span></span> Yoel Tejeda Jr.</td><td>P</td>
+                    <td>6.0</td><td>4</td><td>3</td>
+                    <td>1</td><td>3</td><td>9</td>
+                    <td></td>
+                </tr><tr class="prospect-row">
+                    <td><span class="rank-cluster"><span class="rank-pip" style="background:#AB0003" title="MLB Pipeline #26">26</span> <span class="rank-pip" style="background:#1a7a3a" title="FG Pipeline #25">25</span> <span class="rank-pip" style="background:#14225A" title="BA Pipeline #27">27</span></span> Eriq Swan</td><td>P</td>
+                    <td>3.3</td><td>1</td><td>3</td>
+                    <td>3</td><td>4</td><td>4</td>
+                    <td></td>
+                </tr><tr>
+                    <td>Generic Reliever</td><td>P</td>
+                    <td>3.0</td><td>2</td><td>0</td>
+                    <td>2</td><td>1</td><td>2</td>
+                    <td></td>
+                </tr></tbody></table></div>
+            </div>
+            <div class="affiliate-section">
+                <div class="affiliate-header">
+                    <h2><span class="level-badge">Single-A</span> Fredericksburg Nationals vs Lynchburg Hillcats — <span class="result-badge result-loss">L 5-8</span> <span class="record">(2-1)</span></h2>
+                </div>
+                <h3>Hitting</h3>
+            <div class="table-wrap"><table class="stats-table">
+            <thead><tr><th>Name</th><th>Pos</th><th>AB</th><th>R</th><th>H</th>
+            <th>2B</th><th>3B</th><th>HR</th><th>RBI</th><th>BB</th><th>K</th>
+            <th>SB</th><th>AVG</th></tr></thead>
+            <tbody><tr class="prospect-row">
+                    <td><span class="rank-cluster"><span class="rank-pip" style="background:#AB0003" title="MLB Pipeline #11">11</span> <span class="rank-pip" style="background:#1a7a3a" title="FG Pipeline #10">10</span> <span class="rank-pip" style="background:#14225A" title="BA Pipeline #12">12</span></span> Coy James</td><td>SS</td>
+                    <td>5</td><td>1</td><td>4</td>
+                    <td>1</td><td>0</td><td>0</td>
+                    <td>2</td><td>0</td><td>2</td>
+                    <td>0</td><td>0.800</td>
+                </tr><tr>
+                    <td>John Doe</td><td>1B</td>
+                    <td>5</td><td>1</td><td>3</td>
+                    <td>0</td><td>0</td><td>0</td>
+                    <td>1</td><td>2</td><td>2</td>
+                    <td>0</td><td>0.600</td>
+                </tr><tr>
+                    <td>Mike Smith</td><td>LF</td>
+                    <td>5</td><td>0</td><td>3</td>
+                    <td>0</td><td>0</td><td>1</td>
+                    <td>2</td><td>2</td><td>1</td>
+                    <td>0</td><td>0.600</td>
+                </tr><tr class="prospect-row">
+                    <td><span class="rank-cluster"><span class="rank-pip" style="background:#AB0003" title="MLB Pipeline #5">5</span> <span class="rank-pip" style="background:#1a7a3a" title="FG Pipeline #7">7</span> <span class="rank-pip" style="background:#14225A" title="BA Pipeline #5">5</span></span> Gavin Fien</td><td>SS</td>
+                    <td>5</td><td>1</td><td>2</td>
+                    <td>1</td><td>0</td><td>0</td>
+                    <td>0</td><td>0</td><td>3</td>
+                    <td>1</td><td>0.400</td>
+                </tr><tr class="prospect-row">
+                    <td><span class="rank-cluster"><span class="rank-pip" style="background:#AB0003" title="MLB Pipeline #1">1</span> <span class="rank-pip" style="background:#1a7a3a" title="FG Pipeline #1">1</span> <span class="rank-pip" style="background:#14225A" title="BA Pipeline #1">1</span></span> Eli Willits</td><td>SS</td>
+                    <td>5</td><td>1</td><td>1</td>
+                    <td>0</td><td>0</td><td>1</td>
+                    <td>0</td><td>0</td><td>2</td>
+                    <td>1</td><td>0.200</td>
+                </tr><tr class="prospect-row">
+                    <td><span class="rank-cluster"><span class="rank-pip" style="background:#AB0003" title="MLB Pipeline #25">25</span> <span class="rank-pip" style="background:#1a7a3a" title="FG Pipeline #26">26</span> <span class="rank-pip" style="background:#14225A" title="BA Pipeline #25">25</span></span> Ronny Cruz</td><td>SS</td>
+                    <td>4</td><td>0</td><td>3</td>
+                    <td>1</td><td>0</td><td>0</td>
+                    <td>2</td><td>1</td><td>1</td>
+                    <td>1</td><td>0.750</td>
+                </tr><tr>
+                    <td>Jake Wilson</td><td>2B</td>
+                    <td>4</td><td>2</td><td>0</td>
+                    <td>0</td><td>0</td><td>0</td>
+                    <td>2</td><td>0</td><td>2</td>
+                    <td>0</td><td>.000</td>
+                </tr><tr class="prospect-row">
+                    <td><span class="rank-cluster"><span class="rank-pip" style="background:#AB0003" title="MLB Pipeline #20">20</span> <span class="rank-pip" style="background:#1a7a3a" title="FG Pipeline #17">17</span> <span class="rank-pip" style="background:#14225A" title="BA Pipeline #18">18</span></span> Yeremy Cabrera</td><td>RF</td>
+                    <td>3</td><td>2</td><td>3</td>
+                    <td>1</td><td>0</td><td>1</td>
+                    <td>0</td><td>1</td><td>1</td>
+                    <td>1</td><td>1.000</td>
+                </tr><tr class="prospect-row">
+                    <td><span class="rank-cluster"><span class="rank-pip" style="background:#AB0003" title="MLB Pipeline #13">13</span> <span class="rank-pip" style="background:#1a7a3a" title="FG Pipeline #12">12</span> <span class="rank-pip" style="background:#14225A" title="BA Pipeline #14">14</span></span> Ethan Petry</td><td>CF</td>
+                    <td>3</td><td>0</td><td>0</td>
+                    <td>0</td><td>0</td><td>0</td>
+                    <td>3</td><td>0</td><td>1</td>
+                    <td>1</td><td>.000</td>
+                </tr><tr>
+                    <td>Tom Brown</td><td>DH</td>
+                    <td>3</td><td>0</td><td>0</td>
+                    <td>0</td><td>0</td><td>0</td>
+                    <td>1</td><td>2</td><td>2</td>
+                    <td>0</td><td>.000</td>
+                </tr></tbody></table></div><h3>Pitching</h3>
+            <div class="table-wrap"><table class="stats-table">
+            <thead><tr><th>Name</th><th>Pos</th><th>IP</th><th>H</th><th>R</th>
+            <th>ER</th><th>BB</th><th>K</th><th>Dec</th></tr></thead>
+            <tbody><tr class="prospect-row">
+                    <td><span class="rank-cluster"><span class="rank-pip" style="background:#AB0003" title="MLB Pipeline #17">17</span> <span class="rank-pip" style="background:#1a7a3a" title="FG Pipeline #19">19</span> <span class="rank-pip" style="background:#14225A" title="BA Pipeline #17">17</span></span> Miguel Sime Jr.</td><td>P</td>
+                    <td>5.6</td><td>2</td><td>5</td>
+                    <td>3</td><td>2</td><td>3</td>
+                    <td>(W, 3-1)</td>
+                </tr><tr class="prospect-row">
+                    <td><span class="rank-cluster"><span class="rank-pip" style="background:#AB0003" title="MLB Pipeline #9">9</span> <span class="rank-pip" style="background:#1a7a3a" title="FG Pipeline #8">8</span> <span class="rank-pip" style="background:#14225A" title="BA Pipeline #9">9</span></span> Landon Harmon</td><td>P</td>
+                    <td>4.7</td><td>7</td><td>1</td>
+                    <td>0</td><td>4</td><td>8</td>
+                    <td></td>
+                </tr><tr>
+                    <td>Generic Reliever</td><td>P</td>
+                    <td>2.2</td><td>1</td><td>2</td>
+                    <td>0</td><td>2</td><td>0</td>
+                    <td></td>
+                </tr></tbody></table></div>
+            </div>
+    
+    <div class="prospect-tracker">
+        <h2>Season-to-Date Prospect Tracker</h2>
+        <div class="rank-legend">
+            Rankings: <span class="rank-pip" style="background:#AB0003">MLB</span>
+            <span class="rank-pip" style="background:#1a7a3a">FG</span>
+            <span class="rank-pip" style="background:#14225A">BA</span>
+            &nbsp;|&nbsp;
+            <span class="trend-up">&#9650;</span> Hot
+            <span class="trend-flat">&#9654;</span> Steady
+            <span class="trend-down">&#9660;</span> Cold
+        </div>
+        
+        <h3>Position Prospect Season Stats</h3>
+        <div class="table-wrap"><table class="stats-table">
+        <thead><tr>
+            <th>Name</th><th>Pos</th><th>Level</th><th>G</th><th>AB</th>
+            <th>AVG</th><th>H</th><th>HR</th><th>RBI</th><th>BB</th>
+            <th>K</th><th>SB</th><th>OBP</th><th>SLG</th><th>OPS</th>
+            <th>Last 7d</th><th>Last 15d</th>
+        </tr></thead>
+        <tbody><tr class="prospect-row">
+                <td><span class="rank-cluster"><span class="rank-pip" style="background:#AB0003" title="MLB Pipeline #1">1</span> <span class="rank-pip" style="background:#1a7a3a" title="FG Pipeline #1">1</span> <span class="rank-pip" style="background:#14225A" title="BA Pipeline #1">1</span></span> Eli Willits</td>
+                <td>SS</td><td>Single-A</td>
+                <td>3</td><td>12</td>
+                <td>0.583</td><td>7</td>
+                <td>3</td><td>2</td>
+                <td>1</td><td>4</td>
+                <td>2</td>
+                <td>0.615</td>
+                <td>1.500</td>
+                <td>2.115</td>
+                <td>0.583 (3g) <span class="trend-flat" title="Steady">&#9654;</span></td>
+                <td>0.583 (3g)</td>
+            </tr><tr class="prospect-row">
+                <td><span class="rank-cluster"><span class="rank-pip" style="background:#AB0003" title="MLB Pipeline #4">4</span> <span class="rank-pip" style="background:#1a7a3a" title="FG Pipeline #2">2</span> <span class="rank-pip" style="background:#14225A" title="BA Pipeline #3">3</span></span> Jarlin Susana</td>
+                <td>RHP</td><td>AA</td>
+                <td>3</td><td>11</td>
+                <td>0.636</td><td>7</td>
+                <td>3</td><td>7</td>
+                <td>4</td><td>5</td>
+                <td>2</td>
+                <td>0.733</td>
+                <td>1.545</td>
+                <td>2.278</td>
+                <td>0.636 (3g) <span class="trend-flat" title="Steady">&#9654;</span></td>
+                <td>0.636 (3g)</td>
+            </tr><tr class="prospect-row">
+                <td><span class="rank-cluster"><span class="rank-pip" style="background:#AB0003" title="MLB Pipeline #3">3</span> <span class="rank-pip" style="background:#1a7a3a" title="FG Pipeline #3">3</span> <span class="rank-pip" style="background:#14225A" title="BA Pipeline #4">4</span></span> Harry Ford</td>
+                <td>C</td><td>AAA</td>
+                <td>3</td><td>15</td>
+                <td>0.533</td><td>8</td>
+                <td>1</td><td>2</td>
+                <td>0</td><td>4</td>
+                <td>1</td>
+                <td>0.533</td>
+                <td>0.933</td>
+                <td>1.466</td>
+                <td>0.533 (3g) <span class="trend-flat" title="Steady">&#9654;</span></td>
+                <td>0.533 (3g)</td>
+            </tr><tr class="prospect-row">
+                <td><span class="rank-cluster"><span class="rank-pip" style="background:#AB0003" title="MLB Pipeline #5">5</span> <span class="rank-pip" style="background:#1a7a3a" title="FG Pipeline #7">7</span> <span class="rank-pip" style="background:#14225A" title="BA Pipeline #5">5</span></span> Gavin Fien</td>
+                <td>SS</td><td>Single-A</td>
+                <td>3</td><td>12</td>
+                <td>0.417</td><td>5</td>
+                <td>1</td><td>3</td>
+                <td>3</td><td>5</td>
+                <td>1</td>
+                <td>0.533</td>
+                <td>0.750</td>
+                <td>1.283</td>
+                <td>0.417 (3g) <span class="trend-flat" title="Steady">&#9654;</span></td>
+                <td>0.417 (3g)</td>
+            </tr><tr class="prospect-row">
+                <td><span class="rank-cluster"><span class="rank-pip" style="background:#AB0003" title="MLB Pipeline #7">7</span> <span class="rank-pip" style="background:#1a7a3a" title="FG Pipeline #9">9</span> <span class="rank-pip" style="background:#14225A" title="BA Pipeline #7">7</span></span> Seaver King</td>
+                <td>SS</td><td>High-A</td>
+                <td>3</td><td>10</td>
+                <td>0.300</td><td>3</td>
+                <td>0</td><td>2</td>
+                <td>4</td><td>2</td>
+                <td>0</td>
+                <td>0.500</td>
+                <td>0.300</td>
+                <td>0.800</td>
+                <td>0.300 (3g) <span class="trend-flat" title="Steady">&#9654;</span></td>
+                <td>0.300 (3g)</td>
+            </tr><tr class="prospect-row">
+                <td><span class="rank-cluster"><span class="rank-pip" style="background:#AB0003" title="MLB Pipeline #11">11</span> <span class="rank-pip" style="background:#1a7a3a" title="FG Pipeline #10">10</span> <span class="rank-pip" style="background:#14225A" title="BA Pipeline #12">12</span></span> Coy James</td>
+                <td>SS</td><td>Single-A</td>
+                <td>3</td><td>13</td>
+                <td>0.308</td><td>4</td>
+                <td>0</td><td>5</td>
+                <td>2</td><td>5</td>
+                <td>2</td>
+                <td>0.400</td>
+                <td>0.385</td>
+                <td>0.785</td>
+                <td>0.308 (3g) <span class="trend-flat" title="Steady">&#9654;</span></td>
+                <td>0.308 (3g)</td>
+            </tr><tr class="prospect-row">
+                <td><span class="rank-cluster"><span class="rank-pip" style="background:#AB0003" title="MLB Pipeline #13">13</span> <span class="rank-pip" style="background:#1a7a3a" title="FG Pipeline #12">12</span> <span class="rank-pip" style="background:#14225A" title="BA Pipeline #14">14</span></span> Ethan Petry</td>
+                <td>OF</td><td>Single-A</td>
+                <td>3</td><td>12</td>
+                <td>0.083</td><td>1</td>
+                <td>0</td><td>7</td>
+                <td>2</td><td>3</td>
+                <td>2</td>
+                <td>0.214</td>
+                <td>0.167</td>
+                <td>0.381</td>
+                <td>0.083 (3g) <span class="trend-flat" title="Steady">&#9654;</span></td>
+                <td>0.083 (3g)</td>
+            </tr><tr class="prospect-row">
+                <td><span class="rank-cluster"><span class="rank-pip" style="background:#AB0003" title="MLB Pipeline #20">20</span> <span class="rank-pip" style="background:#1a7a3a" title="FG Pipeline #17">17</span> <span class="rank-pip" style="background:#14225A" title="BA Pipeline #18">18</span></span> Yeremy Cabrera</td>
+                <td>OF</td><td>Single-A</td>
+                <td>3</td><td>11</td>
+                <td>0.636</td><td>7</td>
+                <td>2</td><td>5</td>
+                <td>2</td><td>5</td>
+                <td>1</td>
+                <td>0.692</td>
+                <td>1.545</td>
+                <td>2.237</td>
+                <td>0.636 (3g) <span class="trend-flat" title="Steady">&#9654;</span></td>
+                <td>0.636 (3g)</td>
+            </tr><tr class="prospect-row">
+                <td><span class="rank-cluster"><span class="rank-pip" style="background:#AB0003" title="MLB Pipeline #18">18</span> <span class="rank-pip" style="background:#1a7a3a" title="FG Pipeline #18">18</span> <span class="rank-pip" style="background:#14225A" title="BA Pipeline #20">20</span></span> Christian Franklin</td>
+                <td>OF</td><td>AAA</td>
+                <td>3</td><td>10</td>
+                <td>0.500</td><td>5</td>
+                <td>1</td><td>2</td>
+                <td>4</td><td>5</td>
+                <td>2</td>
+                <td>0.643</td>
+                <td>1.000</td>
+                <td>1.643</td>
+                <td>0.500 (3g) <span class="trend-flat" title="Steady">&#9654;</span></td>
+                <td>0.500 (3g)</td>
+            </tr><tr class="prospect-row">
+                <td><span class="rank-cluster"><span class="rank-pip" style="background:#AB0003" title="MLB Pipeline #19">19</span> <span class="rank-pip" style="background:#1a7a3a" title="FG Pipeline #20">20</span> <span class="rank-pip" style="background:#14225A" title="BA Pipeline #19">19</span></span> Andrew Pinckney</td>
+                <td>OF</td><td>AAA</td>
+                <td>3</td><td>13</td>
+                <td>0.231</td><td>3</td>
+                <td>0</td><td>5</td>
+                <td>4</td><td>3</td>
+                <td>1</td>
+                <td>0.412</td>
+                <td>0.385</td>
+                <td>0.797</td>
+                <td>0.231 (3g) <span class="trend-flat" title="Steady">&#9654;</span></td>
+                <td>0.231 (3g)</td>
+            </tr><tr class="prospect-row">
+                <td><span class="rank-cluster"><span class="rank-pip" style="background:#AB0003" title="MLB Pipeline #22">22</span> <span class="rank-pip" style="background:#1a7a3a" title="FG Pipeline #21">21</span> <span class="rank-pip" style="background:#14225A" title="BA Pipeline #23">23</span></span> Sam Petersen</td>
+                <td>OF</td><td>AA</td>
+                <td>3</td><td>11</td>
+                <td>0.364</td><td>4</td>
+                <td>1</td><td>4</td>
+                <td>2</td><td>7</td>
+                <td>0</td>
+                <td>0.462</td>
+                <td>0.636</td>
+                <td>1.098</td>
+                <td>0.364 (3g) <span class="trend-flat" title="Steady">&#9654;</span></td>
+                <td>0.364 (3g)</td>
+            </tr><tr class="prospect-row">
+                <td><span class="rank-cluster"><span class="rank-pip" style="background:#AB0003" title="MLB Pipeline #24">24</span> <span class="rank-pip" style="background:#1a7a3a" title="FG Pipeline #23">23</span> <span class="rank-pip" style="background:#14225A" title="BA Pipeline #24">24</span></span> Abimelec Ortiz</td>
+                <td>1B</td><td>High-A</td>
+                <td>3</td><td>11</td>
+                <td>0.091</td><td>1</td>
+                <td>0</td><td>5</td>
+                <td>1</td><td>8</td>
+                <td>3</td>
+                <td>0.167</td>
+                <td>0.091</td>
+                <td>0.258</td>
+                <td>0.091 (3g) <span class="trend-flat" title="Steady">&#9654;</span></td>
+                <td>0.091 (3g)</td>
+            </tr><tr class="prospect-row">
+                <td><span class="rank-cluster"><span class="rank-pip" style="background:#AB0003" title="MLB Pipeline #25">25</span> <span class="rank-pip" style="background:#1a7a3a" title="FG Pipeline #26">26</span> <span class="rank-pip" style="background:#14225A" title="BA Pipeline #25">25</span></span> Ronny Cruz</td>
+                <td>SS</td><td>Single-A</td>
+                <td>3</td><td>12</td>
+                <td>0.667</td><td>8</td>
+                <td>1</td><td>6</td>
+                <td>5</td><td>4</td>
+                <td>1</td>
+                <td>0.765</td>
+                <td>1.083</td>
+                <td>1.848</td>
+                <td>0.667 (3g) <span class="trend-flat" title="Steady">&#9654;</span></td>
+                <td>0.667 (3g)</td>
+            </tr><tr class="prospect-row">
+                <td><span class="rank-cluster"><span class="rank-pip" style="background:#AB0003" title="MLB Pipeline #28">28</span> <span class="rank-pip" style="background:#1a7a3a" title="FG Pipeline #27">27</span> <span class="rank-pip" style="background:#14225A" title="BA Pipeline #28">28</span></span> Caleb Lomavita</td>
+                <td>C</td><td>High-A</td>
+                <td>3</td><td>9</td>
+                <td>0.444</td><td>4</td>
+                <td>2</td><td>6</td>
+                <td>0</td><td>2</td>
+                <td>2</td>
+                <td>0.444</td>
+                <td>1.222</td>
+                <td>1.666</td>
+                <td>0.444 (3g) <span class="trend-flat" title="Steady">&#9654;</span></td>
+                <td>0.444 (3g)</td>
+            </tr><tr class="prospect-row">
+                <td><span class="rank-cluster"><span class="rank-pip" style="background:#AB0003" title="MLB Pipeline #29">29</span> <span class="rank-pip" style="background:#1a7a3a" title="FG Pipeline #29">29</span> <span class="rank-pip" style="background:#14225A" title="BA Pipeline #30">30</span></span> Yohandy Morales</td>
+                <td>3B</td><td>AA</td>
+                <td>3</td><td>14</td>
+                <td>0.357</td><td>5</td>
+                <td>0</td><td>4</td>
+                <td>6</td><td>5</td>
+                <td>1</td>
+                <td>0.550</td>
+                <td>0.571</td>
+                <td>1.121</td>
+                <td>0.357 (3g) <span class="trend-flat" title="Steady">&#9654;</span></td>
+                <td>0.357 (3g)</td>
+            </tr><tr class="prospect-row">
+                <td><span class="rank-cluster"><span class="rank-pip" style="background:#AB0003" title="MLB Pipeline #30">30</span> <span class="rank-pip" style="background:#1a7a3a" title="FG Pipeline #30">30</span> <span class="rank-pip" style="background:#14225A" title="BA Pipeline #29">29</span></span> Brady House</td>
+                <td>SS/3B</td><td>AA</td>
+                <td>3</td><td>11</td>
+                <td>0.364</td><td>4</td>
+                <td>0</td><td>6</td>
+                <td>2</td><td>5</td>
+                <td>2</td>
+                <td>0.462</td>
+                <td>0.455</td>
+                <td>0.917</td>
+                <td>0.364 (3g) <span class="trend-flat" title="Steady">&#9654;</span></td>
+                <td>0.364 (3g)</td>
+            </tr></tbody></table></div>
+        <h3>Pitching Prospect Season Stats</h3>
+        <div class="table-wrap"><table class="stats-table">
+        <thead><tr>
+            <th>Name</th><th>Pos</th><th>Level</th><th>G</th><th>IP</th>
+            <th>ERA</th><th>WHIP</th><th>K</th><th>BB</th><th>H</th>
+            <th>ER</th><th>K/9</th><th>Last 7d</th><th>Last 15d</th>
+        </tr></thead>
+        <tbody><tr class="prospect-row">
+                <td><span class="rank-cluster"><span class="rank-pip" style="background:#AB0003" title="MLB Pipeline #4">4</span> <span class="rank-pip" style="background:#1a7a3a" title="FG Pipeline #2">2</span> <span class="rank-pip" style="background:#14225A" title="BA Pipeline #3">3</span></span> Jarlin Susana</td>
+                <td>RHP</td><td>AA</td>
+                <td>3</td><td>12.6</td>
+                <td>5.71</td><td>1.59</td>
+                <td>18</td><td>7</td>
+                <td>13</td><td>8</td>
+                <td>12.9</td>
+                <td>5.71 (3g) <span class="trend-flat" title="Steady">&#9654;</span></td>
+                <td>5.71 (3g)</td>
+            </tr><tr class="prospect-row">
+                <td><span class="rank-cluster"><span class="rank-pip" style="background:#AB0003" title="MLB Pipeline #8">8</span> <span class="rank-pip" style="background:#1a7a3a" title="FG Pipeline #5">5</span> <span class="rank-pip" style="background:#14225A" title="BA Pipeline #6">6</span></span> Alex Clemmey</td>
+                <td>LHP</td><td>AA</td>
+                <td>3</td><td>15.2</td>
+                <td>4.14</td><td>1.12</td>
+                <td>20</td><td>1</td>
+                <td>16</td><td>7</td>
+                <td>11.8</td>
+                <td>4.14 (3g) <span class="trend-flat" title="Steady">&#9654;</span></td>
+                <td>4.14 (3g)</td>
+            </tr><tr class="prospect-row">
+                <td><span class="rank-cluster"><span class="rank-pip" style="background:#AB0003" title="MLB Pipeline #6">6</span> <span class="rank-pip" style="background:#1a7a3a" title="FG Pipeline #6">6</span> <span class="rank-pip" style="background:#14225A" title="BA Pipeline #8">8</span></span> Luis Perales</td>
+                <td>RHP</td><td>AAA</td>
+                <td>3</td><td>12.4</td>
+                <td>1.45</td><td>1.77</td>
+                <td>20</td><td>9</td>
+                <td>13</td><td>2</td>
+                <td>14.5</td>
+                <td>1.45 (3g) <span class="trend-flat" title="Steady">&#9654;</span></td>
+                <td>1.45 (3g)</td>
+            </tr><tr class="prospect-row">
+                <td><span class="rank-cluster"><span class="rank-pip" style="background:#AB0003" title="MLB Pipeline #9">9</span> <span class="rank-pip" style="background:#1a7a3a" title="FG Pipeline #8">8</span> <span class="rank-pip" style="background:#14225A" title="BA Pipeline #9">9</span></span> Landon Harmon</td>
+                <td>RHP</td><td>Single-A</td>
+                <td>3</td><td>13.0</td>
+                <td>2.77</td><td>1.38</td>
+                <td>19</td><td>9</td>
+                <td>9</td><td>4</td>
+                <td>13.2</td>
+                <td>2.77 (3g) <span class="trend-flat" title="Steady">&#9654;</span></td>
+                <td>2.77 (3g)</td>
+            </tr><tr class="prospect-row">
+                <td><span class="rank-cluster"><span class="rank-pip" style="background:#AB0003" title="MLB Pipeline #14">14</span> <span class="rank-pip" style="background:#1a7a3a" title="FG Pipeline #13">13</span> <span class="rank-pip" style="background:#14225A" title="BA Pipeline #13">13</span></span> Jackson Kent</td>
+                <td>LHP</td><td>AA</td>
+                <td>3</td><td>16.9</td>
+                <td>3.73</td><td>1.30</td>
+                <td>16</td><td>7</td>
+                <td>15</td><td>7</td>
+                <td>8.5</td>
+                <td>3.73 (3g) <span class="trend-flat" title="Steady">&#9654;</span></td>
+                <td>3.73 (3g)</td>
+            </tr><tr class="prospect-row">
+                <td><span class="rank-cluster"><span class="rank-pip" style="background:#AB0003" title="MLB Pipeline #15">15</span> <span class="rank-pip" style="background:#1a7a3a" title="FG Pipeline #16">16</span> <span class="rank-pip" style="background:#14225A" title="BA Pipeline #15">15</span></span> Yoel Tejeda Jr.</td>
+                <td>RHP</td><td>High-A</td>
+                <td>3</td><td>15.5</td>
+                <td>2.32</td><td>1.61</td>
+                <td>29</td><td>7</td>
+                <td>18</td><td>4</td>
+                <td>16.8</td>
+                <td>2.32 (3g) <span class="trend-flat" title="Steady">&#9654;</span></td>
+                <td>2.32 (3g)</td>
+            </tr><tr class="prospect-row">
+                <td><span class="rank-cluster"><span class="rank-pip" style="background:#AB0003" title="MLB Pipeline #17">17</span> <span class="rank-pip" style="background:#1a7a3a" title="FG Pipeline #19">19</span> <span class="rank-pip" style="background:#14225A" title="BA Pipeline #17">17</span></span> Miguel Sime Jr.</td>
+                <td>RHP</td><td>Single-A</td>
+                <td>3</td><td>17.1</td>
+                <td>4.21</td><td>0.82</td>
+                <td>18</td><td>5</td>
+                <td>9</td><td>8</td>
+                <td>9.5</td>
+                <td>4.21 (3g) <span class="trend-flat" title="Steady">&#9654;</span></td>
+                <td>4.21 (3g)</td>
+            </tr><tr class="prospect-row">
+                <td><span class="rank-cluster"><span class="rank-pip" style="background:#AB0003" title="MLB Pipeline #26">26</span> <span class="rank-pip" style="background:#1a7a3a" title="FG Pipeline #25">25</span> <span class="rank-pip" style="background:#14225A" title="BA Pipeline #27">27</span></span> Eriq Swan</td>
+                <td>RHP</td><td>High-A</td>
+                <td>3</td><td>10.7</td>
+                <td>7.57</td><td>1.31</td>
+                <td>19</td><td>8</td>
+                <td>6</td><td>9</td>
+                <td>16.0</td>
+                <td>7.57 (3g) <span class="trend-flat" title="Steady">&#9654;</span></td>
+                <td>7.57 (3g)</td>
+            </tr><tr class="prospect-row">
+                <td><span class="rank-cluster"><span class="rank-pip" style="background:#AB0003" title="MLB Pipeline #27">27</span> <span class="rank-pip" style="background:#1a7a3a" title="FG Pipeline #28">28</span> <span class="rank-pip" style="background:#14225A" title="BA Pipeline #26">26</span></span> Sean Paul Linan</td>
+                <td>RHP</td><td>AAA</td>
+                <td>3</td><td>15.4</td>
+                <td>4.09</td><td>0.97</td>
+                <td>20</td><td>6</td>
+                <td>9</td><td>7</td>
+                <td>11.7</td>
+                <td>4.09 (3g) <span class="trend-flat" title="Steady">&#9654;</span></td>
+                <td>4.09 (3g)</td>
+            </tr></tbody></table></div>
+    </div>
+</div>
+<div class="footer">
+    Generated 2026-03-24 21:42 &middot;
+    Data from MLB Stats API &middot; Nats MiLB Tracker
+</div>
+</body>
+</html>

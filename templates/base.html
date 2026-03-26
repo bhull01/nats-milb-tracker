@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}Nats MiLB Tracker{% endblock %}</title>
+<style>
+:root {
+  --red:   #AB0003;
+  --navy:  #14225A;
+  --gold:  #C4A049;
+  --bg:    #f4f5f7;
+  --card:  #ffffff;
+  --border:#e1e4e8;
+  --text:  #24292e;
+  --muted: #586069;
+  --green-bg: #e6ffed;
+  --red-bg:   #ffeef0;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+       background:var(--bg); color:var(--text); line-height:1.5; }
+
+/* ── Header ── */
+.site-header {
+  background:linear-gradient(135deg, var(--navy), #1a2d6d);
+  color:#fff; padding:16px 32px;
+  display:flex; align-items:center; gap:16px;
+}
+.site-header .curly-w { font-size:32px; color:var(--red);
+                         text-shadow:0 0 16px rgba(171,0,3,.5); line-height:1; }
+.site-header h1 { font-size:20px; font-weight:700; }
+.site-header .tagline { font-size:12px; opacity:.7; margin-top:1px; }
+
+/* ── Top Nav ── */
+.top-nav {
+  background:#fff; border-bottom:1px solid var(--border);
+  display:flex; align-items:center; gap:4px; padding:0 24px;
+}
+.top-nav a {
+  display:inline-block; padding:10px 16px; font-size:13px; font-weight:600;
+  color:var(--muted); text-decoration:none; border-bottom:3px solid transparent;
+  transition:color .15s, border-color .15s;
+}
+.top-nav a:hover { color:var(--navy); }
+.top-nav a.active { color:var(--navy); border-bottom-color:var(--red); }
+
+/* ── Layout ── */
+.container { max-width:1340px; margin:0 auto; padding:20px 16px; }
+
+/* ── Cards ── */
+.card {
+  background:var(--card); border-radius:10px; border:1px solid var(--border);
+  padding:18px 22px; margin-bottom:18px;
+  box-shadow:0 1px 3px rgba(0,0,0,.04);
+}
+.card-title {
+  font-size:15px; font-weight:700; color:var(--navy);
+  margin-bottom:14px; display:flex; align-items:center; gap:8px;
+}
+
+/* ── Tables ── */
+.table-wrap { overflow-x:auto; }
+.stats-table { width:100%; border-collapse:collapse; font-size:12px; }
+.stats-table th {
+  background:var(--navy); color:#fff; padding:6px 9px;
+  text-align:left; font-size:10px; font-weight:600;
+  text-transform:uppercase; letter-spacing:.4px; white-space:nowrap;
+}
+.stats-table td { padding:5px 9px; border-bottom:1px solid var(--border); white-space:nowrap; }
+.stats-table tbody tr:hover { background:#f6f8fa; }
+.stats-table .prospect-row { background:#fffde7 !important; }
+.stats-table .prospect-row:hover { background:#fff9c4 !important; }
+
+/* ── Badges ── */
+.level-badge {
+  background:var(--navy); color:#fff;
+  padding:2px 8px; border-radius:4px;
+  font-size:10px; font-weight:700; letter-spacing:.5px; text-transform:uppercase;
+}
+.result-badge { padding:2px 8px; border-radius:4px; font-size:12px; font-weight:700; }
+.result-win  { background:var(--green-bg); color:#22863a; }
+.result-loss { background:var(--red-bg);   color:#cb2431; }
+.result-tie  { background:#e8eaf6;         color:#3949ab; }
+.result-pending { background:#fff8e1;      color:#856404; }
+
+/* ── Rank pips + tooltips ── */
+.rank-cluster { display:inline-flex; gap:2px; vertical-align:middle; }
+.rank-pip {
+  display:inline-block; color:#fff; padding:1px 5px;
+  border-radius:3px; font-size:9px; font-weight:700;
+  min-width:18px; text-align:center;
+}
+.rank-na { background:#ccc !important; color:#555 !important; }
+/* CSS tooltip */
+.has-tip { position:relative; cursor:default; }
+.pip-tip {
+  display:none;
+  position:absolute; bottom:calc(100% + 4px); left:50%;
+  transform:translateX(-50%);
+  background:#1a1a1a; color:#fff;
+  padding:4px 8px; border-radius:5px;
+  font-size:11px; font-weight:400; white-space:nowrap;
+  pointer-events:none; z-index:999;
+  box-shadow:0 2px 8px rgba(0,0,0,.3);
+}
+.pip-tip::after {
+  content:''; position:absolute; top:100%; left:50%; transform:translateX(-50%);
+  border:4px solid transparent; border-top-color:#1a1a1a;
+}
+.has-tip:hover .pip-tip { display:block; }
+
+/* ── Trend arrows ── */
+.trend-up   { color:#22863a; font-weight:700; font-size:11px; }
+.trend-down { color:#cb2431; font-weight:700; font-size:11px; }
+.trend-flat { color:#6a737d; font-size:10px; }
+
+/* ── Player links ── */
+a.player-link { color:var(--navy); text-decoration:none; font-weight:600; }
+a.player-link:hover { text-decoration:underline; color:var(--red); }
+
+/* ── Org tag (shown on game log rows from pre-trade / non-Nats stats) ── */
+.org-tag {
+  display:inline-block; font-size:9px; font-weight:700; letter-spacing:.3px;
+  background:var(--gold); color:var(--navy); border-radius:3px;
+  padding:1px 4px; vertical-align:middle; margin-left:3px;
+}
+
+/* ── Misc ── */
+.muted { color:var(--muted); font-size:12px; }
+.no-data { color:var(--muted); font-style:italic; padding:8px 0; font-size:13px; }
+.record { color:var(--muted); font-size:12px; font-weight:400; }
+.footer { text-align:center; padding:24px; color:var(--muted); font-size:11px; border-top:1px solid var(--border); margin-top:12px; }
+
+{% block extra_styles %}{% endblock %}
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="curly-w">W</div>
+  <div>
+    <h1>Nationals Minor League Tracker</h1>
+    <div class="tagline">Prospect performance across all four affiliates</div>
+  </div>
+</header>
+
+<nav class="top-nav">
+  <a href="{{ url_for('day_view', date=request.view_args.get('date', '')) if request.endpoint == 'day_view' else url_for('index') }}"
+     class="{{ 'active' if request.endpoint == 'day_view' else '' }}">Daily</a>
+  <a href="{{ url_for('season_view') }}"
+     class="{{ 'active' if request.endpoint == 'season_view' else '' }}">Season</a>
+  <a href="{{ url_for('players_view') }}"
+     class="{{ 'active' if request.endpoint in ('players_view', 'player_view') else '' }}">Players</a>
+</nav>
+
+<div class="container">
+  {% block content %}{% endblock %}
+</div>
+
+<footer class="footer">
+  Data from MLB Stats API &middot; Nats MiLB Tracker
+</footer>
+
+</body>
+</html>

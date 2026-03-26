@@ -1,0 +1,367 @@
+{% extends "base.html" %}
+{% from "macros.html" import rank_pips %}
+{% block title %}{{ year }} Season – Nats MiLB Tracker{% endblock %}
+
+{% block extra_styles %}
+.season-header {
+  display:flex; align-items:center; justify-content:space-between;
+  flex-wrap:wrap; gap:10px; margin-bottom:16px;
+}
+.year-switcher { display:flex; align-items:center; gap:8px; font-size:13px; }
+.year-switcher a {
+  padding:4px 10px; border-radius:5px; text-decoration:none;
+  font-size:12px; font-weight:600; border:1px solid var(--border); color:var(--navy);
+}
+.year-switcher a.active { background:var(--navy); color:#fff; border-color:var(--navy); }
+.year-switcher a:hover:not(.active) { background:var(--green-bg); }
+.rank-legend { font-size:11px; color:var(--muted); margin-bottom:10px; }
+
+/* Metric selector inside <th> */
+.metric-select {
+  appearance:none; -webkit-appearance:none;
+  background:rgba(255,255,255,.15); border:1px solid rgba(255,255,255,.4);
+  color:#fff; border-radius:4px; padding:2px 18px 2px 5px;
+  font-size:10px; font-weight:700; cursor:pointer;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M0 0l4 5 4-5z' fill='%23fff'/%3E%3C/svg%3E");
+  background-repeat:no-repeat; background-position:right 4px center;
+}
+.metric-select:focus { outline:none; }
+.metric-select option { background:var(--navy); color:#fff; }
+.th-metric { display:flex; align-items:center; gap:4px; white-space:nowrap; }
+th.sortable { cursor:pointer; user-select:none; }
+th.sortable:hover { background:#1e3278; }
+th.sort-asc::after  { content:' ▲'; font-size:9px; opacity:.8; }
+th.sort-desc::after { content:' ▼'; font-size:9px; opacity:.8; }
+{% endblock %}
+
+{% block content %}
+
+<div class="season-header">
+  <div>
+    <strong style="font-size:16px; color:var(--navy);">{{ year }} Season Prospect Tracker</strong>
+    <div class="muted">Ranked prospects only · Hover rank badges for source details</div>
+  </div>
+  {% if available_years | length > 1 %}
+  <div class="year-switcher">
+    <span>Year:</span>
+    {% for y in available_years %}
+      <a href="{{ url_for('season_view', year=y) }}"
+         class="{{ 'active' if y == year else '' }}">{{ y }}</a>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+
+<div class="rank-legend">
+  <span class="trend-up">▲</span> Hot &nbsp;
+  <span class="trend-flat">▶</span> Steady &nbsp;
+  <span class="trend-down">▼</span> Cold &nbsp;(vs. season avg)
+</div>
+
+{# ── Hitting ── #}
+{% if hitters %}
+<div class="card" style="border-color:var(--gold);">
+  <div class="card-title">🏏 Position Prospect Hitting</div>
+  <div class="table-wrap">
+    <table class="stats-table" id="hit-table">
+      <thead>
+        <tr>
+          <th class="sortable" onclick="sortTable('hit-table',0,false)">Name</th>
+          <th class="sortable" onclick="sortTable('hit-table',1,true)">Rnk</th>
+          <th class="sortable" onclick="sortTable('hit-table',2,false)">Pos</th>
+          <th class="sortable" onclick="sortTable('hit-table',3,false)">Lvl</th>
+          <th class="sortable" onclick="sortTable('hit-table',4,true)">G</th>
+          <th class="sortable" onclick="sortTable('hit-table',5,true)">AB</th>
+          <th class="sortable" onclick="sortTable('hit-table',6,true)">AVG</th>
+          <th class="sortable" onclick="sortTable('hit-table',7,true)">OBP</th>
+          <th class="sortable" onclick="sortTable('hit-table',8,true)">SLG</th>
+          <th class="sortable" onclick="sortTable('hit-table',9,true)">OPS</th>
+          <th class="sortable" onclick="sortTable('hit-table',10,true)">H</th>
+          <th class="sortable" onclick="sortTable('hit-table',11,true)">HR</th>
+          <th class="sortable" onclick="sortTable('hit-table',12,true)">RBI</th>
+          <th class="sortable" onclick="sortTable('hit-table',13,true)">BB</th>
+          <th class="sortable" onclick="sortTable('hit-table',14,true)">K</th>
+          <th class="sortable" onclick="sortTable('hit-table',15,true)">SB</th>
+          <th>
+            <div class="th-metric">
+              <select class="metric-select" id="hitMetric"
+                      onchange="updateHitMetric(this.value)">
+                <option value="avg">AVG</option>
+                <option value="obp">OBP</option>
+                <option value="slg">SLG</option>
+                <option value="ops">OPS</option>
+                <option value="hr">HR</option>
+                <option value="rbi">RBI</option>
+                <option value="k">K</option>
+              </select>
+              Last 15G
+            </div>
+          </th>
+          <th id="col-last30-label">Last 30G</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in hitters %}
+        {% set p = row.prospect %}
+        {% set s = row.season %}
+        <tr class="prospect-row">
+          <td><a class="player-link" href="{{ url_for('player_view', name=p.name) }}">{{ p.name }}</a></td>
+          <td data-sort="{{ p.composite_rank or 999 }}">{{ rank_pips(p) }}</td>
+          <td>{{ p.position }}</td>
+          <td>{{ p.level }}</td>
+          <td>{{ s.games }}</td>
+          <td>{{ s.ab }}</td>
+          <td><strong>{{ s.avg | fmt_avg }}</strong></td>
+          <td>{{ s.obp | fmt_avg }}</td>
+          <td>{{ s.slg | fmt_avg }}</td>
+          <td>{{ s.ops | fmt_avg }}</td>
+          <td>{{ s.h }}</td><td>{{ s.hr }}</td><td>{{ s.rbi }}</td>
+          <td>{{ s.bb }}</td><td>{{ s.k }}</td><td>{{ s.sb }}</td>
+          {# Last-15G cell – stores all metrics as data attrs #}
+          <td class="rolling-cell"
+              {% if row.last15 %}
+              data-avg="{{ row.last15.avg | fmt_avg }}"
+              data-obp="{{ row.last15.obp | fmt_avg }}"
+              data-slg="{{ row.last15.slg | fmt_avg }}"
+              data-ops="{{ row.last15.ops | fmt_avg }}"
+              data-hr="{{ row.last15.hr }}"
+              data-rbi="{{ row.last15.rbi }}"
+              data-k="{{ row.last15.k }}"
+              data-season-avg="{{ s.avg }}"
+              {% endif %}>
+            {% if row.last15 %}
+              <span class="roll-val">{{ row.last15.avg | fmt_avg }}</span>
+              {{ (row.last15.avg, s.avg) | trend_arrow_hit | safe }}
+            {% else %}—{% endif %}
+          </td>
+          {# Last-30G cell #}
+          <td class="rolling-cell"
+              {% if row.last30 %}
+              data-avg="{{ row.last30.avg | fmt_avg }}"
+              data-obp="{{ row.last30.obp | fmt_avg }}"
+              data-slg="{{ row.last30.slg | fmt_avg }}"
+              data-ops="{{ row.last30.ops | fmt_avg }}"
+              data-hr="{{ row.last30.hr }}"
+              data-rbi="{{ row.last30.rbi }}"
+              data-k="{{ row.last30.k }}"
+              data-season-avg="{{ s.avg }}"
+              {% endif %}>
+            {% if row.last30 %}
+              <span class="roll-val">{{ row.last30.avg | fmt_avg }}</span>
+              {{ (row.last30.avg, s.avg) | trend_arrow_hit | safe }}
+            {% else %}—{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+{# ── Pitching ── #}
+{% if pitchers %}
+<div class="card" style="border-color:var(--navy);">
+  <div class="card-title">⚾ Pitching Prospect Stats</div>
+  <div class="table-wrap">
+    <table class="stats-table" id="pitch-table">
+      <thead>
+        <tr>
+          <th class="sortable" onclick="sortTable('pitch-table',0,false)">Name</th>
+          <th class="sortable" onclick="sortTable('pitch-table',1,true)">Rnk</th>
+          <th class="sortable" onclick="sortTable('pitch-table',2,false)">Pos</th>
+          <th class="sortable" onclick="sortTable('pitch-table',3,false)">Lvl</th>
+          <th class="sortable" onclick="sortTable('pitch-table',4,true)">G</th>
+          <th class="sortable" onclick="sortTable('pitch-table',5,true)">IP</th>
+          <th class="sortable" onclick="sortTable('pitch-table',6,true)">ERA</th>
+          <th class="sortable" onclick="sortTable('pitch-table',7,true)">FIP</th>
+          <th class="sortable" onclick="sortTable('pitch-table',8,true)">WHIP</th>
+          <th class="sortable" onclick="sortTable('pitch-table',9,true)">K/9</th>
+          <th class="sortable" onclick="sortTable('pitch-table',10,true)">K</th>
+          <th class="sortable" onclick="sortTable('pitch-table',11,true)">BB</th>
+          <th class="sortable" onclick="sortTable('pitch-table',12,true)">HR</th>
+          <th class="sortable" onclick="sortTable('pitch-table',13,true)">H</th>
+          <th class="sortable" onclick="sortTable('pitch-table',14,true)">ER</th>
+          <th>
+            <div class="th-metric">
+              <select class="metric-select" id="pitchMetric"
+                      onchange="updatePitchMetric(this.value)">
+                <option value="era">ERA</option>
+                <option value="fip">FIP</option>
+                <option value="whip">WHIP</option>
+                <option value="k9">K/9</option>
+                <option value="k">K</option>
+                <option value="bb">BB</option>
+                <option value="hr">HR</option>
+              </select>
+              Last 5G
+            </div>
+          </th>
+          <th id="col-pitch-last15-label">Last 15G</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in pitchers %}
+        {% set p = row.prospect %}
+        {% set s = row.season %}
+        <tr class="prospect-row">
+          <td><a class="player-link" href="{{ url_for('player_view', name=p.name) }}">{{ p.name }}</a></td>
+          <td data-sort="{{ p.composite_rank or 999 }}">{{ rank_pips(p) }}</td>
+          <td>{{ p.position }}</td>
+          <td>{{ p.level }}</td>
+          <td>{{ s.games }}</td>
+          <td>{{ s.ip | fmt_ip }}</td>
+          <td><strong>{{ s.era | fmt_era }}</strong></td>
+          <td>
+            {% if s.fip is not none %}
+              <span class="has-tip">
+                {{ s.fip | fmt_era }}
+                <span class="pip-tip" style="font-size:11px; font-weight:400;">
+                  FIP = (13×HR + 3×BB − 2×K) / IP + 3.10
+                </span>
+              </span>
+            {% else %}—{% endif %}
+          </td>
+          <td>{{ s.whip | fmt_era }}</td>
+          <td>{{ s.k_per_9 | fmt_era }}</td>
+          <td>{{ s.k }}</td><td>{{ s.bb }}</td>
+          <td>{{ s.hr or 0 }}</td>
+          <td>{{ s.h }}</td><td>{{ s.er }}</td>
+          <td class="pitch-rolling-cell"
+              {% if row.last5 %}
+              data-era="{{ row.last5.era | fmt_era }}"
+              data-fip="{{ row.last5.fip | fmt_era if row.last5.fip is not none else '—' }}"
+              data-whip="{{ row.last5.whip | fmt_era }}"
+              data-k9="{{ row.last5.k9 | fmt_era }}"
+              data-k="{{ row.last5.k }}"
+              data-bb="{{ row.last5.bb }}"
+              data-hr="{{ row.last5.hr or 0 }}"
+              data-season-era="{{ s.era }}"
+              {% endif %}>
+            {% if row.last5 %}
+              <span class="roll-val">{{ row.last5.era | fmt_era }}</span>
+              {{ (row.last5.era, s.era) | trend_arrow_era | safe }}
+            {% else %}—{% endif %}
+          </td>
+          <td class="pitch-rolling-cell"
+              {% if row.last15 %}
+              data-era="{{ row.last15.era | fmt_era }}"
+              data-fip="{{ row.last15.fip | fmt_era if row.last15.fip is not none else '—' }}"
+              data-whip="{{ row.last15.whip | fmt_era }}"
+              data-k9="{{ row.last15.k9 | fmt_era }}"
+              data-k="{{ row.last15.k }}"
+              data-bb="{{ row.last15.bb }}"
+              data-hr="{{ row.last15.hr or 0 }}"
+              data-season-era="{{ s.era }}"
+              {% endif %}>
+            {% if row.last15 %}
+              <span class="roll-val">{{ row.last15.era | fmt_era }}</span>
+              {{ (row.last15.era, s.era) | trend_arrow_era | safe }}
+            {% else %}—{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+{% if not hitters and not pitchers %}
+  <div class="card">
+    <p class="no-data">No prospect data found for {{ year }}. Make sure you've run the backfill for this season.</p>
+  </div>
+{% endif %}
+
+<script>
+// ── Column sort ──
+const sortState = {};
+
+function sortTable(tableId, colIdx, isNumeric) {
+  const table = document.getElementById(tableId);
+  const state = sortState[tableId] || {};
+  const asc = (state.col === colIdx) ? !state.asc : !isNumeric;
+  sortState[tableId] = { col: colIdx, asc };
+
+  table.querySelectorAll('thead th').forEach((th, i) => {
+    th.classList.remove('sort-asc', 'sort-desc');
+    if (i === colIdx) th.classList.add(asc ? 'sort-asc' : 'sort-desc');
+  });
+
+  const tbody = table.querySelector('tbody');
+  const rows = Array.from(tbody.querySelectorAll('tr'));
+  rows.sort((a, b) => {
+    const aCell = a.cells[colIdx];
+    const bCell = b.cells[colIdx];
+    const aText = (aCell?.dataset.sort ?? aCell?.textContent ?? '').trim();
+    const bText = (bCell?.dataset.sort ?? bCell?.textContent ?? '').trim();
+    let cmp;
+    if (isNumeric) {
+      const aNum = parseFloat(aText.replace(/[^0-9.\-]/g, '')) || 0;
+      const bNum = parseFloat(bText.replace(/[^0-9.\-]/g, '')) || 0;
+      cmp = aNum - bNum;
+    } else {
+      cmp = aText.localeCompare(bText);
+    }
+    return asc ? cmp : -cmp;
+  });
+  rows.forEach(r => tbody.appendChild(r));
+}
+
+// Metrics where lower = better (ERA, FIP, WHIP → flip trend arrow logic)
+const LOWER_IS_BETTER = new Set(['era', 'fip', 'whip']);
+// Count metrics: no trend arrow
+const COUNT_METRICS = new Set(['hr', 'rbi', 'k', 'bb']);
+
+function updateHitMetric(metric) {
+  const isCount = COUNT_METRICS.has(metric);
+
+  document.querySelectorAll('#hit-table .rolling-cell').forEach(td => {
+    const val = td.dataset[metric];
+    if (!val && val !== '0') { td.innerHTML = '—'; return; }
+
+    // Rebuild cell: value + optional trend arrow
+    let html = `<span class="roll-val">${val}</span>`;
+    if (!isCount) {
+      const recent = parseFloat(val);
+      const season = parseFloat(td.dataset.seasonAvg || '0');
+      const diff = recent - season;
+      if      (diff >  0.030) html += ' <span class="trend-up"   title="Hot">▲</span>';
+      else if (diff < -0.030) html += ' <span class="trend-down" title="Cold">▼</span>';
+      else                     html += ' <span class="trend-flat" title="Steady">▶</span>';
+    }
+    td.innerHTML = html;
+  });
+
+  // Update the column 30G label to match
+  document.getElementById('col-last30-label').textContent =
+    `Last 30G ${metric.toUpperCase()}`;
+}
+
+function updatePitchMetric(metric) {
+  const isCount = COUNT_METRICS.has(metric);
+  const lowerBetter = LOWER_IS_BETTER.has(metric);
+
+  document.querySelectorAll('.pitch-rolling-cell').forEach(td => {
+    const val = td.dataset[metric];
+    if (!val && val !== '0') { td.innerHTML = '—'; return; }
+    if (val === '—') { td.innerHTML = '—'; return; }
+
+    let html = `<span class="roll-val">${val}</span>`;
+    if (!isCount) {
+      const recent = parseFloat(val);
+      const season = parseFloat(td.dataset.seasonEra || '0');
+      const diff = lowerBetter ? (recent - season) : (season - recent);
+      if      (diff < -0.30) html += ' <span class="trend-up"   title="Improving">▲</span>';
+      else if (diff >  0.30) html += ' <span class="trend-down" title="Struggling">▼</span>';
+      else                    html += ' <span class="trend-flat" title="Steady">▶</span>';
+    }
+    td.innerHTML = html;
+  });
+
+  document.getElementById('col-pitch-last15-label').textContent =
+    `Last 15G ${metric.toUpperCase()}`;
+}
+</script>
+
+{% endblock %}

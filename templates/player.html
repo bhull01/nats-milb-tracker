@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+{% from "macros.html" import rank_pips %}
+{% block title %}{{ name }} – Nats MiLB Tracker{% endblock %}
+
+{% block extra_styles %}
+.player-hero {
+  background:linear-gradient(135deg, var(--navy), #1a2d6d);
+  color:#fff; border-radius:10px; padding:20px 24px;
+  margin-bottom:18px; display:flex; align-items:center; gap:20px;
+}
+.player-hero-info h2 { font-size:22px; font-weight:700; }
+.player-hero-info .meta { font-size:13px; opacity:.75; margin-top:4px; }
+.stat-cards { display:grid; grid-template-columns:repeat(auto-fill,minmax(100px,1fr)); gap:10px; margin-bottom:18px; }
+.stat-card {
+  background:var(--card); border:1px solid var(--border); border-radius:8px;
+  padding:12px 14px; text-align:center;
+}
+.stat-card .val { font-size:22px; font-weight:700; color:var(--navy); }
+.stat-card .lbl { font-size:10px; text-transform:uppercase; letter-spacing:.5px; color:var(--muted); margin-top:2px; }
+.rolling-cards { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:18px; }
+.rolling-card { background:var(--card); border:1px solid var(--border); border-radius:8px; padding:14px 16px; }
+.rolling-card h4 { font-size:12px; text-transform:uppercase; letter-spacing:.4px; color:var(--muted); margin-bottom:10px; }
+.rolling-stat { display:flex; justify-content:space-between; font-size:12px; padding:3px 0; border-bottom:1px solid var(--border); }
+.rolling-stat:last-child { border:none; }
+.rolling-stat .lbl { color:var(--muted); }
+.rolling-stat .val { font-weight:600; }
+{% endblock %}
+
+{% block content %}
+
+{# ── Hero ── #}
+<div class="player-hero">
+  <div class="player-hero-info">
+    <h2>{{ name }}</h2>
+    {% if prospect_info %}
+    <div class="meta">
+      {{ prospect_info.position }} &middot; {{ prospect_info.level }} &middot; {{ year }} Season
+    </div>
+    <div style="margin-top:8px;">{{ rank_pips(prospect_info) }}</div>
+    {% else %}
+    <div class="meta">{{ year }} Season</div>
+    {% endif %}
+  </div>
+</div>
+
+{# ── Hitting ── #}
+{% if season_hit %}
+<div class="card">
+  <div class="card-title">🏏 {{ year }} Hitting</div>
+  <div class="stat-cards">
+    <div class="stat-card"><div class="val">{{ season_hit.avg | fmt_avg }}</div><div class="lbl">AVG</div></div>
+    <div class="stat-card"><div class="val">{{ season_hit.obp | fmt_avg }}</div><div class="lbl">OBP</div></div>
+    <div class="stat-card"><div class="val">{{ season_hit.slg | fmt_avg }}</div><div class="lbl">SLG</div></div>
+    <div class="stat-card"><div class="val">{{ season_hit.ops | fmt_avg }}</div><div class="lbl">OPS</div></div>
+    <div class="stat-card"><div class="val">{{ season_hit.games }}</div><div class="lbl">G</div></div>
+    <div class="stat-card"><div class="val">{{ season_hit.ab }}</div><div class="lbl">AB</div></div>
+    <div class="stat-card"><div class="val">{{ season_hit.h }}</div><div class="lbl">H</div></div>
+    <div class="stat-card"><div class="val">{{ season_hit.hr }}</div><div class="lbl">HR</div></div>
+    <div class="stat-card"><div class="val">{{ season_hit.rbi }}</div><div class="lbl">RBI</div></div>
+    <div class="stat-card"><div class="val">{{ season_hit.sb }}</div><div class="lbl">SB</div></div>
+    <div class="stat-card"><div class="val">{{ season_hit.bb }}</div><div class="lbl">BB</div></div>
+    <div class="stat-card"><div class="val">{{ season_hit.k }}</div><div class="lbl">K</div></div>
+  </div>
+
+  {% if last7_hit or last15_hit %}
+  <div class="rolling-cards">
+    {% if last7_hit %}
+    <div class="rolling-card">
+      <h4>Last 7 Days ({{ last7_hit.games }}g)</h4>
+      <div class="rolling-stat"><span class="lbl">AVG</span><span class="val">{{ last7_hit.avg | fmt_avg }}</span></div>
+      <div class="rolling-stat"><span class="lbl">H</span><span class="val">{{ last7_hit.h }}</span></div>
+      <div class="rolling-stat"><span class="lbl">HR</span><span class="val">{{ last7_hit.hr }}</span></div>
+      <div class="rolling-stat"><span class="lbl">RBI</span><span class="val">{{ last7_hit.rbi }}</span></div>
+      <div class="rolling-stat"><span class="lbl">BB</span><span class="val">{{ last7_hit.bb }}</span></div>
+      <div class="rolling-stat"><span class="lbl">K</span><span class="val">{{ last7_hit.k }}</span></div>
+    </div>
+    {% endif %}
+    {% if last15_hit %}
+    <div class="rolling-card">
+      <h4>Last 15 Days ({{ last15_hit.games }}g)</h4>
+      <div class="rolling-stat"><span class="lbl">AVG</span><span class="val">{{ last15_hit.avg | fmt_avg }}</span></div>
+      <div class="rolling-stat"><span class="lbl">H</span><span class="val">{{ last15_hit.h }}</span></div>
+      <div class="rolling-stat"><span class="lbl">HR</span><span class="val">{{ last15_hit.hr }}</span></div>
+      <div class="rolling-stat"><span class="lbl">RBI</span><span class="val">{{ last15_hit.rbi }}</span></div>
+      <div class="rolling-stat"><span class="lbl">BB</span><span class="val">{{ last15_hit.bb }}</span></div>
+      <div class="rolling-stat"><span class="lbl">K</span><span class="val">{{ last15_hit.k }}</span></div>
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% if hit_log %}
+  <h3 style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; margin:14px 0 8px;">Game Log</h3>
+  <div class="table-wrap">
+    <table class="stats-table">
+      <thead>
+        <tr><th>Date</th><th>Lvl</th><th>AB</th><th>R</th><th>H</th>
+        <th>2B</th><th>3B</th><th>HR</th><th>RBI</th><th>BB</th><th>K</th><th>SB</th><th>AVG</th></tr>
+      </thead>
+      <tbody>
+        {% for row in hit_log %}
+        <tr>
+          <td><a class="player-link" href="{{ url_for('day_view', date=row.date) }}">{{ row.date }}</a></td>
+          <td>{{ row.level }}{% if row.source_org %} <span class="org-tag">{{ row.source_org }}</span>{% endif %}</td>
+          <td>{{ row.ab }}</td><td>{{ row.r }}</td><td>{{ row.h }}</td>
+          <td>{{ row.doubles }}</td><td>{{ row.triples }}</td><td>{{ row.hr }}</td>
+          <td>{{ row.rbi }}</td><td>{{ row.bb }}</td><td>{{ row.k }}</td><td>{{ row.sb }}</td>
+          <td>{{ (row.h / row.ab) | fmt_avg if row.ab else '.000' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
+{# ── Pitching ── #}
+{% if season_pitch %}
+<div class="card">
+  <div class="card-title">⚾ {{ year }} Pitching</div>
+  <div class="stat-cards">
+    <div class="stat-card"><div class="val">{{ season_pitch.era | fmt_era }}</div><div class="lbl">ERA</div></div>
+    <div class="stat-card"><div class="val">{{ season_pitch.whip | fmt_era }}</div><div class="lbl">WHIP</div></div>
+    <div class="stat-card"><div class="val">{{ season_pitch.k_per_9 | fmt_era }}</div><div class="lbl">K/9</div></div>
+    <div class="stat-card"><div class="val">{{ season_pitch.games }}</div><div class="lbl">G</div></div>
+    <div class="stat-card"><div class="val">{{ season_pitch.ip | fmt_ip }}</div><div class="lbl">IP</div></div>
+    <div class="stat-card"><div class="val">{{ season_pitch.k }}</div><div class="lbl">K</div></div>
+    <div class="stat-card"><div class="val">{{ season_pitch.bb }}</div><div class="lbl">BB</div></div>
+    <div class="stat-card"><div class="val">{{ season_pitch.h }}</div><div class="lbl">H</div></div>
+    <div class="stat-card"><div class="val">{{ season_pitch.er }}</div><div class="lbl">ER</div></div>
+  </div>
+
+  {% if last7_pitch or last15_pitch %}
+  <div class="rolling-cards">
+    {% if last7_pitch %}
+    <div class="rolling-card">
+      <h4>Last 7 Days ({{ last7_pitch.games }}g)</h4>
+      <div class="rolling-stat"><span class="lbl">ERA</span><span class="val">{{ last7_pitch.era | fmt_era }}</span></div>
+      <div class="rolling-stat"><span class="lbl">IP</span><span class="val">{{ last7_pitch.ip | fmt_ip }}</span></div>
+      <div class="rolling-stat"><span class="lbl">K</span><span class="val">{{ last7_pitch.k }}</span></div>
+      <div class="rolling-stat"><span class="lbl">BB</span><span class="val">{{ last7_pitch.bb }}</span></div>
+      <div class="rolling-stat"><span class="lbl">H</span><span class="val">{{ last7_pitch.h }}</span></div>
+    </div>
+    {% endif %}
+    {% if last15_pitch %}
+    <div class="rolling-card">
+      <h4>Last 15 Days ({{ last15_pitch.games }}g)</h4>
+      <div class="rolling-stat"><span class="lbl">ERA</span><span class="val">{{ last15_pitch.era | fmt_era }}</span></div>
+      <div class="rolling-stat"><span class="lbl">IP</span><span class="val">{{ last15_pitch.ip | fmt_ip }}</span></div>
+      <div class="rolling-stat"><span class="lbl">K</span><span class="val">{{ last15_pitch.k }}</span></div>
+      <div class="rolling-stat"><span class="lbl">BB</span><span class="val">{{ last15_pitch.bb }}</span></div>
+      <div class="rolling-stat"><span class="lbl">H</span><span class="val">{{ last15_pitch.h }}</span></div>
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% if pitch_log %}
+  <h3 style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; margin:14px 0 8px;">Game Log</h3>
+  <div class="table-wrap">
+    <table class="stats-table">
+      <thead>
+        <tr><th>Date</th><th>Lvl</th><th>IP</th><th>H</th><th>R</th>
+        <th>ER</th><th>BB</th><th>K</th><th>Dec</th></tr>
+      </thead>
+      <tbody>
+        {% for row in pitch_log %}
+        <tr>
+          <td><a class="player-link" href="{{ url_for('day_view', date=row.date) }}">{{ row.date }}</a></td>
+          <td>{{ row.level }}{% if row.source_org %} <span class="org-tag">{{ row.source_org }}</span>{% endif %}</td>
+          <td>{{ row.ip | fmt_ip }}</td>
+          <td>{{ row.h }}</td><td>{{ row.r }}</td><td>{{ row.er }}</td>
+          <td>{{ row.bb }}</td><td>{{ row.k }}</td>
+          <td>{{ row.decision or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
+{% endblock %}

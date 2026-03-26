@@ -1,0 +1,208 @@
+{% extends "base.html" %}
+{% from "macros.html" import rank_pips %}
+{% block title %}{{ date }} – Nats MiLB Tracker{% endblock %}
+
+{% block extra_styles %}
+.date-nav {
+  display:flex; align-items:center; gap:10px;
+  background:#fff; border-bottom:1px solid var(--border);
+  padding:10px 24px;
+}
+.nav-btn {
+  padding:5px 12px; border-radius:6px; text-decoration:none;
+  font-size:12px; font-weight:600; border:1px solid var(--border);
+  color:var(--navy); background:#fff; cursor:pointer;
+}
+.nav-btn:hover { background:var(--green-bg); }
+.nav-btn.disabled { opacity:.4; pointer-events:none; }
+.date-select {
+  padding:5px 10px; border-radius:6px; border:1px solid var(--border);
+  font-size:13px; cursor:pointer;
+}
+.date-display { font-size:14px; font-weight:600; color:var(--navy); flex:1; text-align:center; }
+
+/* Key performers */
+.performers-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:10px; }
+.performer-card {
+  display:flex; align-items:center; gap:10px;
+  padding:8px 12px; border-radius:8px;
+  border:1px solid var(--border); background:#fafbfc;
+  min-width:0; overflow:hidden;
+}
+.performer-card:hover { background:var(--green-bg); }
+.performer-info { flex:1; min-width:0; overflow:hidden; }
+.performer-name { font-weight:600; font-size:13px;
+                  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.performer-name a { color:var(--navy); text-decoration:none; }
+.performer-name a:hover { color:var(--red); text-decoration:underline; }
+.performer-meta { font-size:10px; color:var(--muted); }
+.performer-line { font-family:'SF Mono',Menlo,monospace; font-size:11px;
+                  color:var(--navy); font-weight:600; white-space:nowrap;
+                  flex-shrink:0; }
+
+/* Affiliate sections */
+.affiliate-header {
+  display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  margin-bottom:12px;
+}
+.affiliate-header h2 { font-size:15px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.affiliate-title { font-size:14px; color:var(--text); font-weight:600; }
+.no-game-text { color:var(--muted); font-size:13px; font-weight:400; }
+.game-section { margin-bottom:6px; }
+h3.stat-section { font-size:11px; color:var(--muted); text-transform:uppercase;
+                   letter-spacing:.5px; margin:14px 0 6px; }
+{% endblock %}
+
+{% block content %}
+
+{# ── Date nav ── #}
+<div class="date-nav">
+  {% if prev_date %}
+    <a class="nav-btn" href="{{ url_for('day_view', date=prev_date) }}">◀ {{ prev_date }}</a>
+  {% else %}
+    <span class="nav-btn disabled">◀ Prev</span>
+  {% endif %}
+
+  <span class="date-display">{{ date | date_display }}</span>
+
+  <form method="get" action="" id="date-form" style="display:inline">
+    <select class="date-select" name="_date" onchange="window.location='/day/'+this.value">
+      {% for d in all_dates %}
+        <option value="{{ d }}" {{ 'selected' if d == date else '' }}>{{ d }}</option>
+      {% endfor %}
+    </select>
+  </form>
+
+  {% if next_date %}
+    <a class="nav-btn" href="{{ url_for('day_view', date=next_date) }}">{{ next_date }} ▶</a>
+  {% else %}
+    <span class="nav-btn disabled">Next ▶</span>
+  {% endif %}
+</div>
+
+{# ── Key Performers ── #}
+<div class="card" style="border-color:var(--red);">
+  <div class="card-title">⭐ Key Performers</div>
+  {% if performers %}
+    <div class="performers-grid">
+      {% for pf in performers %}
+      <div class="performer-card">
+        <div class="performer-info">
+          <div class="performer-name">
+            <a href="{{ url_for('player_view', name=pf.full_name) }}">{{ pf.name }}</a>
+          </div>
+          <div class="performer-meta">{{ pf.level }}</div>
+        </div>
+        <div class="performer-line">{{ pf.line }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="no-data">No prospect performances to report for this date.</p>
+  {% endif %}
+</div>
+
+{# ── Affiliate sections ── #}
+{% for lvl in levels %}
+<div class="card game-section">
+  {% if not lvl.games %}
+    <div class="affiliate-header">
+      <h2>
+        <span class="level-badge">{{ lvl.level }}</span>
+        <span class="no-game-text">No game scheduled</span>
+      </h2>
+      {% if lvl.record.games %}
+        <span class="record">({{ lvl.record.wins }}-{{ lvl.record.losses }})</span>
+      {% endif %}
+    </div>
+  {% else %}
+    {% for gd in lvl.games %}
+      {% set g = gd.game %}
+      <div class="affiliate-header">
+        <h2>
+          <span class="level-badge">{{ lvl.level }}</span>
+          <span class="affiliate-title">
+            {{ g.team_name }} {{ 'vs' if g.is_home else '@' }} {{ g.opponent }}
+          </span>
+          {% if g.result %}
+            <span class="result-badge result-{{ 'win' if g.result=='W' else 'loss' if g.result=='L' else 'tie' }}">
+              {{ g.result }} {{ g.our_score }}-{{ g.opp_score }}
+            </span>
+          {% else %}
+            <span class="result-badge result-pending">{{ g.status }}</span>
+          {% endif %}
+          {% if lvl.record.games %}
+            <span class="record">({{ lvl.record.wins }}-{{ lvl.record.losses }})</span>
+          {% endif %}
+        </h2>
+      </div>
+
+      {% if gd.hitters %}
+        <h3 class="stat-section">Hitting</h3>
+        <div class="table-wrap">
+          <table class="stats-table">
+            <thead>
+              <tr>
+                <th>Name</th><th>Pos</th><th>AB</th><th>R</th><th>H</th>
+                <th>2B</th><th>3B</th><th>HR</th><th>RBI</th><th>BB</th>
+                <th>K</th><th>SB</th><th>E</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for h in gd.hitters %}
+              <tr class="{{ 'prospect-row' if h.is_prospect else '' }}">
+                <td>
+                  {% if h.is_prospect %}{{ rank_pips(h.prospect_info) }} {% endif %}
+                  <a class="player-link" href="{{ url_for('player_view', name=h.player_name) }}">{{ h.player_name }}</a>
+                </td>
+                <td>{{ h.position }}</td>
+                <td>{{ h.ab }}</td><td>{{ h.r }}</td><td>{{ h.h }}</td>
+                <td>{{ h.doubles }}</td><td>{{ h.triples }}</td><td>{{ h.hr }}</td>
+                <td>{{ h.rbi }}</td><td>{{ h.bb }}</td><td>{{ h.k }}</td>
+                <td>{{ h.sb }}</td>
+                <td>{{ h.e if h.e else '—' }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% endif %}
+
+      {% if gd.pitchers %}
+        <h3 class="stat-section">Pitching</h3>
+        <div class="table-wrap">
+          <table class="stats-table">
+            <thead>
+              <tr>
+                <th>Name</th><th>Pos</th><th>IP</th><th>H</th><th>R</th>
+                <th>ER</th><th>BB</th><th>K</th><th>Dec</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for p in gd.pitchers %}
+              <tr class="{{ 'prospect-row' if p.is_prospect else '' }}">
+                <td>
+                  {% if p.is_prospect %}{{ rank_pips(p.prospect_info) }} {% endif %}
+                  <a class="player-link" href="{{ url_for('player_view', name=p.player_name) }}">{{ p.player_name }}</a>
+                </td>
+                <td>{{ p.position }}</td>
+                <td>{{ p.ip | fmt_ip }}</td>
+                <td>{{ p.h }}</td><td>{{ p.r }}</td><td>{{ p.er }}</td>
+                <td>{{ p.bb }}</td><td>{{ p.k }}</td>
+                <td>{{ p.decision or '—' }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% endif %}
+
+      {% if not gd.hitters and not gd.pitchers %}
+        <p class="no-data">No stats available — game may be postponed or not yet final.</p>
+      {% endif %}
+    {% endfor %}
+  {% endif %}
+</div>
+{% endfor %}
+
+{% endblock %}

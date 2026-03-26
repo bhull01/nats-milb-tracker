@@ -1,0 +1,24 @@
+{% macro rank_pips(p) %}
+{% if p %}
+<span class="rank-cluster">
+  {% set sources = [
+    ('mlb_rank', 'MLB', '#AB0003', 'MLB Pipeline'),
+    ('fg_rank',  'FG',  '#1a7a3a', 'FanGraphs'),
+    ('ba_rank',  'BA',  '#14225A', 'Baseball America'),
+  ] %}
+  {% for src, label, color, full_name in sources %}
+    {% if p.get(src) %}
+      <span class="rank-pip has-tip" style="background:{{ color }}">
+        {{ p[src] }}
+        <span class="pip-tip">{{ full_name }} #{{ p[src] }}</span>
+      </span>
+    {% else %}
+      <span class="rank-pip rank-na has-tip">
+        —
+        <span class="pip-tip">{{ full_name }}: NR</span>
+      </span>
+    {% endif %}
+  {% endfor %}
+</span>
+{% endif %}
+{% endmacro %}

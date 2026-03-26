@@ -1,0 +1,281 @@
+{
+  "_comment": "Washington Nationals Top 30 Prospects \u2013 Multi-source rankings. Edit this file to update rankings. Use 'python3 nats_tracker.py update-prospects' for guided updates. Ranks are from MLB Pipeline (mlb), FanGraphs (fg), Baseball America (ba). Use null if a player doesn't appear on that list. mlb_player_id can be found with: python3 nats_tracker.py lookup-player \"First Last\"",
+  "_updated": "2026-03-24",
+  "_sources": {
+    "mlb": "MLB Pipeline 2026 Preseason",
+    "fg": "FanGraphs 2026 Preseason",
+    "ba": "Baseball America 2026 Preseason"
+  },
+  "prospects": [
+    {
+      "name": "Eli Willits",
+      "position": "SS",
+      "level": "Single-A",
+      "mlb_rank": 1,
+      "fg_rank": 1,
+      "ba_rank": 1,
+      "mlb_player_id": 816113
+    },
+    {
+      "name": "Travis Sykora",
+      "position": "RHP",
+      "level": "IL (TJS)",
+      "mlb_rank": 2,
+      "fg_rank": 4,
+      "ba_rank": 2,
+      "mlb_player_id": 805809
+    },
+    {
+      "name": "Harry Ford",
+      "position": "C",
+      "level": "AAA",
+      "mlb_rank": 3,
+      "fg_rank": 3,
+      "ba_rank": 4,
+      "mlb_player_id": 695670
+    },
+    {
+      "name": "Jarlin Susana",
+      "position": "RHP",
+      "level": "AA",
+      "mlb_rank": 4,
+      "fg_rank": 2,
+      "ba_rank": 3,
+      "mlb_player_id": 703186
+    },
+    {
+      "name": "Gavin Fien",
+      "position": "SS",
+      "level": "Single-A",
+      "mlb_rank": 5,
+      "fg_rank": 7,
+      "ba_rank": 5,
+      "mlb_player_id": 815818
+    },
+    {
+      "name": "Luis Perales",
+      "position": "RHP",
+      "level": "AAA",
+      "mlb_rank": 6,
+      "fg_rank": 6,
+      "ba_rank": 8,
+      "mlb_player_id": 691384
+    },
+    {
+      "name": "Seaver King",
+      "position": "SS",
+      "level": "High-A",
+      "mlb_rank": 7,
+      "fg_rank": 9,
+      "ba_rank": 7,
+      "mlb_player_id": 814409
+    },
+    {
+      "name": "Alex Clemmey",
+      "position": "LHP",
+      "level": "AA",
+      "mlb_rank": 8,
+      "fg_rank": 5,
+      "ba_rank": 6,
+      "mlb_player_id": 806046
+    },
+    {
+      "name": "Landon Harmon",
+      "position": "RHP",
+      "level": "Single-A",
+      "mlb_rank": 9,
+      "fg_rank": 8,
+      "ba_rank": 9,
+      "mlb_player_id": null
+    },
+    {
+      "name": "Luke Dickerson",
+      "position": "SS/2B",
+      "level": "Single-A",
+      "mlb_rank": 10,
+      "fg_rank": 11,
+      "ba_rank": 10,
+      "mlb_player_id": 815380
+    },
+    {
+      "name": "Coy James",
+      "position": "SS",
+      "level": "Single-A",
+      "mlb_rank": 11,
+      "fg_rank": 10,
+      "ba_rank": 12,
+      "mlb_player_id": 815983
+    },
+    {
+      "name": "Devin Fitz-Gerald",
+      "position": "SS/3B",
+      "level": "Single-A",
+      "mlb_rank": 12,
+      "fg_rank": 14,
+      "ba_rank": 11,
+      "mlb_player_id": 686638
+    },
+    {
+      "name": "Ethan Petry",
+      "position": "OF",
+      "level": "Single-A",
+      "mlb_rank": 13,
+      "fg_rank": 12,
+      "ba_rank": 14,
+      "mlb_player_id": 701337
+    },
+    {
+      "name": "Jackson Kent",
+      "position": "LHP",
+      "level": "AA",
+      "mlb_rank": 14,
+      "fg_rank": 13,
+      "ba_rank": 13,
+      "mlb_player_id": 800600
+    },
+    {
+      "name": "Yoel Tejeda Jr.",
+      "position": "RHP",
+      "level": "High-A",
+      "mlb_rank": 15,
+      "fg_rank": 16,
+      "ba_rank": 15,
+      "mlb_player_id": 702275
+    },
+    {
+      "name": "Alejandro Rosario",
+      "position": "RHP",
+      "level": "IL (TJS)",
+      "mlb_rank": 16,
+      "fg_rank": 15,
+      "ba_rank": 16,
+      "mlb_player_id": null
+    },
+    {
+      "name": "Miguel Sime Jr.",
+      "position": "RHP",
+      "level": "Single-A",
+      "mlb_rank": 17,
+      "fg_rank": 19,
+      "ba_rank": 17,
+      "mlb_player_id": 702275
+    },
+    {
+      "name": "Christian Franklin",
+      "position": "OF",
+      "level": "AAA",
+      "mlb_rank": 18,
+      "fg_rank": 18,
+      "ba_rank": 20,
+      "mlb_player_id": 681047
+    },
+    {
+      "name": "Andrew Pinckney",
+      "position": "OF",
+      "level": "AAA",
+      "mlb_rank": 19,
+      "fg_rank": 20,
+      "ba_rank": 19,
+      "mlb_player_id": 687605
+    },
+    {
+      "name": "Yeremy Cabrera",
+      "position": "OF",
+      "level": "Single-A",
+      "mlb_rank": 20,
+      "fg_rank": 17,
+      "ba_rank": 18,
+      "mlb_player_id": 800393
+    },
+    {
+      "name": "Marconi German",
+      "position": "SS/2B",
+      "level": "Rookie",
+      "mlb_rank": 21,
+      "fg_rank": 22,
+      "ba_rank": 21,
+      "mlb_player_id": 829699
+    },
+    {
+      "name": "Sam Petersen",
+      "position": "OF",
+      "level": "AA",
+      "mlb_rank": 22,
+      "fg_rank": 21,
+      "ba_rank": 23,
+      "mlb_player_id": 695763
+    },
+    {
+      "name": "Angel Feliz",
+      "position": "INF",
+      "level": "Single-A",
+      "mlb_rank": 23,
+      "fg_rank": 24,
+      "ba_rank": 22,
+      "mlb_player_id": 815906
+    },
+    {
+      "name": "Abimelec Ortiz",
+      "position": "1B",
+      "level": "High-A",
+      "mlb_rank": 24,
+      "fg_rank": 23,
+      "ba_rank": 24,
+      "mlb_player_id": 694673
+    },
+    {
+      "name": "Ronny Cruz",
+      "position": "SS",
+      "level": "Single-A",
+      "mlb_rank": 25,
+      "fg_rank": 26,
+      "ba_rank": 25,
+      "mlb_player_id": 826723
+    },
+    {
+      "name": "Eriq Swan",
+      "position": "RHP",
+      "level": "High-A",
+      "mlb_rank": 26,
+      "fg_rank": 25,
+      "ba_rank": 27,
+      "mlb_player_id": null
+    },
+    {
+      "name": "Sean Paul Linan",
+      "position": "RHP",
+      "level": "AAA",
+      "mlb_rank": 27,
+      "fg_rank": 28,
+      "ba_rank": 26,
+      "mlb_player_id": 800344
+    },
+    {
+      "name": "Caleb Lomavita",
+      "position": "C",
+      "level": "High-A",
+      "mlb_rank": 28,
+      "fg_rank": 27,
+      "ba_rank": 28,
+      "mlb_player_id": 701616
+    },
+    {
+      "name": "Yohandy Morales",
+      "position": "3B",
+      "level": "AA",
+      "mlb_rank": 29,
+      "fg_rank": 29,
+      "ba_rank": 30,
+      "mlb_player_id": 691002
+    },
+    {
+      "name": "Brady House",
+      "position": "SS/3B",
+      "level": "AA",
+      "mlb_rank": 30,
+      "fg_rank": 30,
+      "ba_rank": 29,
+      "mlb_player_id": 691781
+    }
+  ]
+}

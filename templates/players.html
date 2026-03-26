@@ -1,0 +1,220 @@
+{% extends "base.html" %}
+{% from "macros.html" import rank_pips %}
+{% block title %}Players – Nats MiLB Tracker{% endblock %}
+
+{% block extra_styles %}
+.search-bar {
+  display:flex; align-items:center; gap:10px; margin-bottom:16px;
+}
+.search-input {
+  flex:1; max-width:400px; padding:8px 14px; border-radius:8px;
+  border:1px solid var(--border); font-size:14px; outline:none;
+}
+.search-input:focus { border-color:var(--navy); box-shadow:0 0 0 3px rgba(20,34,90,.1); }
+.filter-tabs { display:flex; gap:6px; }
+.filter-tab {
+  padding:5px 14px; border-radius:6px; font-size:12px; font-weight:600;
+  border:1px solid var(--border); cursor:pointer; background:#fff; color:var(--muted);
+}
+.filter-tab.active { background:var(--navy); color:#fff; border-color:var(--navy); }
+.count-label { font-size:12px; color:var(--muted); margin-left:auto; }
+.hidden-row { display:none !important; }
+th.sortable { cursor:pointer; user-select:none; }
+th.sortable:hover { background:#1e3278; }
+th.sort-asc::after  { content:' ▲'; font-size:9px; opacity:.8; }
+th.sort-desc::after { content:' ▼'; font-size:9px; opacity:.8; }
+{% endblock %}
+
+{% block content %}
+
+<div style="margin-bottom:6px;">
+  <strong style="font-size:16px; color:var(--navy);">{{ year }} Player Index</strong>
+  <span class="muted"> — every player with recorded stats. Prospects highlighted.</span>
+</div>
+
+<div class="search-bar">
+  <input class="search-input" id="playerSearch" type="search"
+         placeholder="Search by name…" oninput="filterPlayers()" autofocus>
+  <div class="filter-tabs">
+    <button class="filter-tab active" id="tab-all"      onclick="setFilter('all')">All</button>
+    <button class="filter-tab"        id="tab-prospect" onclick="setFilter('prospect')">Prospects only</button>
+    <button class="filter-tab"        id="tab-hitters"  onclick="setFilter('hitters')">Hitters</button>
+    <button class="filter-tab"        id="tab-pitchers" onclick="setFilter('pitchers')">Pitchers</button>
+  </div>
+  <span class="count-label" id="rowCount"></span>
+</div>
+
+{# ── Hitters ── #}
+<div class="card" id="section-hitters">
+  <div class="card-title">🏏 Hitters</div>
+  <div class="table-wrap">
+    <table class="stats-table" id="hitters-table">
+      <thead>
+        <tr>
+          <th class="sortable" onclick="sortTable('hitters-table',0,false)">Name</th>
+          <th class="sortable" onclick="sortTable('hitters-table',1,true)">Rnk</th>
+          <th class="sortable" onclick="sortTable('hitters-table',2,false)">Lvl</th>
+          <th class="sortable" onclick="sortTable('hitters-table',3,true)">G</th>
+          <th class="sortable" onclick="sortTable('hitters-table',4,true)">AB</th>
+          <th class="sortable" onclick="sortTable('hitters-table',5,true)">H</th>
+          <th class="sortable" onclick="sortTable('hitters-table',6,true)">HR</th>
+          <th class="sortable" onclick="sortTable('hitters-table',7,true)">RBI</th>
+          <th class="sortable" onclick="sortTable('hitters-table',8,true)">BB</th>
+          <th class="sortable" onclick="sortTable('hitters-table',9,true)">K</th>
+          <th class="sortable" onclick="sortTable('hitters-table',10,true)">SB</th>
+          <th class="sortable" onclick="sortTable('hitters-table',11,true)">AVG</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for h in hitters %}
+        <tr class="player-row {{ 'prospect-row' if h.is_prospect else '' }}"
+            data-name="{{ h.player_name | lower }}"
+            data-type="hitter"
+            data-prospect="{{ 'yes' if h.is_prospect else 'no' }}">
+          <td>
+            <a class="player-link" href="{{ url_for('player_view', name=h.player_name) }}">{{ h.player_name }}</a>
+          </td>
+          <td data-sort="{{ h.prospect_info.composite_rank if h.is_prospect and h.prospect_info else 9999 }}">
+            {% if h.is_prospect and h.prospect_info %}{{ rank_pips(h.prospect_info) }}{% endif %}
+          </td>
+          <td>{{ h.level }}</td>
+          <td>{{ h.games }}</td>
+          <td>{{ h.ab }}</td>
+          <td>{{ h.h }}</td>
+          <td>{{ h.hr }}</td>
+          <td>{{ h.rbi }}</td>
+          <td>{{ h.bb }}</td>
+          <td>{{ h.k }}</td>
+          <td>{{ h.sb }}</td>
+          <td>{{ (h.h / h.ab) | fmt_avg if h.ab else '.000' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{# ── Pitchers ── #}
+<div class="card" id="section-pitchers">
+  <div class="card-title">⚾ Pitchers</div>
+  <div class="table-wrap">
+    <table class="stats-table" id="pitchers-table">
+      <thead>
+        <tr>
+          <th class="sortable" onclick="sortTable('pitchers-table',0,false)">Name</th>
+          <th class="sortable" onclick="sortTable('pitchers-table',1,true)">Rnk</th>
+          <th class="sortable" onclick="sortTable('pitchers-table',2,false)">Lvl</th>
+          <th class="sortable" onclick="sortTable('pitchers-table',3,true)">G</th>
+          <th class="sortable" onclick="sortTable('pitchers-table',4,true)">IP</th>
+          <th class="sortable" onclick="sortTable('pitchers-table',5,true)">H</th>
+          <th class="sortable" onclick="sortTable('pitchers-table',6,true)">ER</th>
+          <th class="sortable" onclick="sortTable('pitchers-table',7,true)">BB</th>
+          <th class="sortable" onclick="sortTable('pitchers-table',8,true)">K</th>
+          <th class="sortable" onclick="sortTable('pitchers-table',9,true)">ERA</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in pitchers %}
+        <tr class="player-row {{ 'prospect-row' if p.is_prospect else '' }}"
+            data-name="{{ p.player_name | lower }}"
+            data-type="pitcher"
+            data-prospect="{{ 'yes' if p.is_prospect else 'no' }}">
+          <td>
+            <a class="player-link" href="{{ url_for('player_view', name=p.player_name) }}">{{ p.player_name }}</a>
+          </td>
+          <td data-sort="{{ p.prospect_info.composite_rank if p.is_prospect and p.prospect_info else 9999 }}">
+            {% if p.is_prospect and p.prospect_info %}{{ rank_pips(p.prospect_info) }}{% endif %}
+          </td>
+          <td>{{ p.level }}</td>
+          <td>{{ p.games }}</td>
+          <td>{{ p.ip | fmt_ip }}</td>
+          <td>{{ p.h }}</td>
+          <td>{{ p.er }}</td>
+          <td>{{ p.bb }}</td>
+          <td>{{ p.k }}</td>
+          <td>{{ (p.er * 9 / p.ip) | fmt_era if p.ip else '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+let currentFilter = 'all';
+
+function setFilter(f) {
+  currentFilter = f;
+  document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + f).classList.add('active');
+
+  const showHitters  = (f === 'all' || f === 'hitters'  || f === 'prospect');
+  const showPitchers = (f === 'all' || f === 'pitchers' || f === 'prospect');
+  document.getElementById('section-hitters').style.display  = showHitters  ? '' : 'none';
+  document.getElementById('section-pitchers').style.display = showPitchers ? '' : 'none';
+
+  filterPlayers();
+}
+
+function filterPlayers() {
+  const q = document.getElementById('playerSearch').value.toLowerCase().trim();
+  let visible = 0;
+  document.querySelectorAll('.player-row').forEach(row => {
+    const name     = row.dataset.name;
+    const type     = row.dataset.type;
+    const prospect = row.dataset.prospect;
+
+    const matchSearch  = !q || name.includes(q);
+    const matchFilter  =
+      currentFilter === 'all'      ? true :
+      currentFilter === 'prospect' ? prospect === 'yes' :
+      currentFilter === 'hitters'  ? type === 'hitter' :
+      currentFilter === 'pitchers' ? type === 'pitcher' : true;
+
+    const show = matchSearch && matchFilter;
+    row.style.display = show ? '' : 'none';
+    if (show) visible++;
+  });
+  document.getElementById('rowCount').textContent = visible + ' players';
+}
+
+// Init count on load
+window.addEventListener('DOMContentLoaded', filterPlayers);
+
+// ── Column sort ──
+const sortState = {};  // tableId → {col, asc}
+
+function sortTable(tableId, colIdx, isNumeric) {
+  const table = document.getElementById(tableId);
+  const state = sortState[tableId] || {};
+  const asc = (state.col === colIdx) ? !state.asc : !isNumeric;
+  sortState[tableId] = { col: colIdx, asc };
+
+  // Use all ths (not just sortable) so index always equals column index
+  table.querySelectorAll('thead th').forEach((th, i) => {
+    th.classList.remove('sort-asc', 'sort-desc');
+    if (i === colIdx) th.classList.add(asc ? 'sort-asc' : 'sort-desc');
+  });
+
+  const tbody = table.querySelector('tbody');
+  const rows = Array.from(tbody.querySelectorAll('tr'));
+  rows.sort((a, b) => {
+    const aCell = a.cells[colIdx];
+    const bCell = b.cells[colIdx];
+    // Prefer data-sort attribute (used for rank badges)
+    const aText = (aCell?.dataset.sort ?? aCell?.textContent ?? '').trim();
+    const bText = (bCell?.dataset.sort ?? bCell?.textContent ?? '').trim();
+    let cmp;
+    if (isNumeric) {
+      const aNum = parseFloat(aText.replace(/[^0-9.\-]/g, '')) || 0;
+      const bNum = parseFloat(bText.replace(/[^0-9.\-]/g, '')) || 0;
+      cmp = aNum - bNum;
+    } else {
+      cmp = aText.localeCompare(bText);
+    }
+    return asc ? cmp : -cmp;
+  });
+  rows.forEach(r => tbody.appendChild(r));
+}
+</script>
+{% endblock %}
