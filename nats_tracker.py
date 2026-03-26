@@ -46,7 +46,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 import api
 import db as database
 from config import (
-    AFFILIATES, DATA_DIR, DB_PATH, LEVEL_ORDER,
+    AFFILIATES, DATA_DIR, DATABASE_URL, DB_PATH, LEVEL_ORDER,
     load_prospects, prospect_lookup,
 )
 from dashboard import generate_dashboard
@@ -238,8 +238,8 @@ def cmd_fetch(args):
              total_games, total_hitters + ext_hitters,
              total_pitchers + ext_pitchers)
 
-    # Auto-generate dashboard after fetch
-    if not args.no_dashboard:
+    # Auto-generate static HTML dashboard after fetch (local dev only)
+    if not args.no_dashboard and not DATABASE_URL:
         log.info("Generating dashboard…")
         conn = database.get_connection()
         out_path = str(DATA_DIR / "nats_dashboard.html")
