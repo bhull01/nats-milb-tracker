@@ -144,10 +144,17 @@ def cmd_fetch(args):
                 total_pitchers += 1
 
     # ── Prospects on non-Nats teams ──────────────────────────────────
-    # For every top-30 prospect that has an mlb_player_id set, fetch
-    # their game log filtered to this date.  Skip any game played for
-    # a Nats affiliate (already captured above); store the rest with
-    # source_org so the dashboard can label them correctly.
+    # Only when --ext-prospects flag is passed (slow; use for backfills).
+    # During regular daily fetches, all tracked prospects are on Nats
+    # affiliates and are already captured above.
+    if not getattr(args, 'ext_prospects', False):
+        log.info("Skipping external-org prospect check (use --ext-prospects to enable)")
+        conn.commit()
+        conn.close()
+        log.info("Stored: %d games, %d hitting lines, %d pitching lines",
+                 total_games, total_hitters, total_pitchers)
+        return
+
     log.info("-" * 50)
     log.info("  Checking top-30 prospects on non-Nats teams…")
 
@@ -351,6 +358,7 @@ def cmd_backfill(args):
             date = date_str
             today = False
             dashboard = False
+            ext_prospects = args.ext_prospects
         cmd_fetch(FakeArgs())
         current += timedelta(days=1)
 
@@ -723,6 +731,8 @@ Examples:
     p_fetch.add_argument("--today", action="store_true")
     p_fetch.add_argument("--dashboard", action="store_true",
                          help="Also generate static HTML dashboard")
+    p_fetch.add_argument("--ext-prospects", action="store_true",
+                         help="Also check prospects on non-Nats teams (slow)")
     p_fetch.set_defaults(func=cmd_fetch)
 
     # dashboard
@@ -738,6 +748,8 @@ Examples:
     p_back = sub.add_parser("backfill", help="Fetch a range of dates")
     p_back.add_argument("start_date", help="Start date YYYY-MM-DD")
     p_back.add_argument("end_date", help="End date YYYY-MM-DD")
+    p_back.add_argument("--ext-prospects", action="store_true",
+                        help="Also check prospects on non-Nats teams (slow)")
     p_back.set_defaults(func=cmd_backfill)
 
     # update-prospects
