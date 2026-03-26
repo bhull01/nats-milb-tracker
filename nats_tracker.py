@@ -238,8 +238,9 @@ def cmd_fetch(args):
              total_games, total_hitters + ext_hitters,
              total_pitchers + ext_pitchers)
 
-    # Auto-generate static HTML dashboard after fetch (local dev only)
-    if not args.no_dashboard and not DATABASE_URL:
+    # Static HTML dashboard generation (legacy, disabled by default)
+    # Use --dashboard flag to explicitly generate if needed.
+    if getattr(args, 'dashboard', False):
         log.info("Generating dashboard…")
         conn = database.get_connection()
         out_path = str(DATA_DIR / "nats_dashboard.html")
@@ -346,11 +347,10 @@ def cmd_backfill(args):
         date_str = current.strftime("%Y-%m-%d")
         log.info("Backfill [%d/%d]: %s", day_num, total_days, date_str)
 
-        # Reuse fetch logic with no_dashboard=True
         class FakeArgs:
             date = date_str
             today = False
-            no_dashboard = True
+            dashboard = False
         cmd_fetch(FakeArgs())
         current += timedelta(days=1)
 
@@ -721,8 +721,8 @@ Examples:
     p_fetch = sub.add_parser("fetch", help="Fetch game data for a date")
     p_fetch.add_argument("date", nargs="?", default=None, help="YYYY-MM-DD")
     p_fetch.add_argument("--today", action="store_true")
-    p_fetch.add_argument("--no-dashboard", action="store_true",
-                         help="Skip auto-generating dashboard")
+    p_fetch.add_argument("--dashboard", action="store_true",
+                         help="Also generate static HTML dashboard")
     p_fetch.set_defaults(func=cmd_fetch)
 
     # dashboard
