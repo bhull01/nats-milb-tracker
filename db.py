@@ -171,6 +171,14 @@ CREATE INDEX IF NOT EXISTS idx_pitching_date ON pitching_lines(date);
 #  CONNECTION
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+def _native(val):
+    """Coerce psycopg2 Decimal/numeric types to native Python int/float."""
+    from decimal import Decimal
+    if isinstance(val, Decimal):
+        return int(val) if val == int(val) else float(val)
+    return val
+
+
 class _DictCursor:
     """Wraps a psycopg2 cursor so fetchone/fetchall return dicts."""
 
@@ -182,18 +190,22 @@ class _DictCursor:
         return self
 
     def fetchone(self):
+        if not self._cur.description:
+            return None
         row = self._cur.fetchone()
         if row is None:
             return None
         cols = [desc[0] for desc in self._cur.description]
-        return dict(zip(cols, row))
+        return {c: _native(v) for c, v in zip(cols, row)}
 
     def fetchall(self):
+        if not self._cur.description:
+            return []
         rows = self._cur.fetchall()
         if not rows:
             return []
         cols = [desc[0] for desc in self._cur.description]
-        return [dict(zip(cols, row)) for row in rows]
+        return [{c: _native(v) for c, v in zip(cols, row)} for row in rows]
 
 
 class Connection:
