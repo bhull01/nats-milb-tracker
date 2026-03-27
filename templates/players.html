@@ -19,6 +19,17 @@
 .filter-tab.active { background:var(--navy); color:#fff; border-color:var(--navy); }
 .count-label { font-size:12px; color:var(--muted); margin-left:auto; }
 .hidden-row { display:none !important; }
+.season-header {
+  display:flex; justify-content:space-between; align-items:center;
+  margin-bottom:12px;
+}
+.year-switcher { display:flex; align-items:center; gap:8px; font-size:13px; }
+.year-switcher a {
+  padding:4px 12px; border-radius:6px; text-decoration:none; font-weight:600;
+  border:1px solid var(--border); color:var(--navy);
+}
+.year-switcher a.active { background:var(--navy); color:#fff; border-color:var(--navy); }
+.year-switcher a:hover:not(.active) { background:var(--green-bg); }
 th.sortable { cursor:pointer; user-select:none; }
 th.sortable:hover { background:#1e3278; }
 th.sort-asc::after  { content:' ▲'; font-size:9px; opacity:.8; }
@@ -27,9 +38,20 @@ th.sort-desc::after { content:' ▼'; font-size:9px; opacity:.8; }
 
 {% block content %}
 
-<div style="margin-bottom:6px;">
-  <strong style="font-size:16px; color:var(--navy);">{{ year }} Player Index</strong>
-  <span class="muted"> — every player with recorded stats. Prospects highlighted.</span>
+<div class="season-header">
+  <div>
+    <strong style="font-size:16px; color:var(--navy);">{{ year }} Player Index</strong>
+    <span class="muted"> — every player with recorded stats. Prospects highlighted.</span>
+  </div>
+  {% if available_years | length > 1 %}
+  <div class="year-switcher">
+    <span>Year:</span>
+    {% for y in available_years %}
+      <a href="{{ url_for('players_view', year=y) }}"
+         class="{{ 'active' if y == year else '' }}">{{ y }}</a>
+    {% endfor %}
+  </div>
+  {% endif %}
 </div>
 
 <div class="search-bar">

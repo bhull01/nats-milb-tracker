@@ -202,9 +202,13 @@ def season_view():
 
 @app.route("/players")
 def players_view():
+    year = request.args.get("year", type=int)
     conn = database.get_connection()
-    row = conn.execute("SELECT MAX(date) as d FROM games").fetchone()
-    year = int(row["d"][:4]) if row and row["d"] else datetime.now().year
+
+    # Auto-detect year from DB if not specified
+    if not year:
+        row = conn.execute("SELECT MAX(date) as d FROM games").fetchone()
+        year = int(row["d"][:4]) if row and row["d"] else datetime.now().year
 
     prospects = prospect_lookup()
     prospect_map = {p["name"].lower(): p for p in prospects.values()}
@@ -234,7 +238,6 @@ def players_view():
         HAVING SUM(ip) > 0
         ORDER BY SUM(ip) DESC
     """), (f"{year}-%",)).fetchall()
-    conn.close()
 
     def enrich(r):
         d = dict(r)
@@ -249,9 +252,19 @@ def players_view():
     hitter_names = {h["player_name"] for h in hitters}
     pitchers_only = [p for p in pitchers if p["player_name"] not in hitter_names]
 
+    # Available years
+    years = conn.execute(
+        "SELECT DISTINCT substring(date FROM 1 FOR 4) as y FROM games ORDER BY y DESC"
+        if database.USE_PG else
+        "SELECT DISTINCT substr(date,1,4) as y FROM games ORDER BY y DESC"
+    ).fetchall()
+    available_years = [int(r["y"]) for r in years]
+
+    conn.close()
+
     return render_template("players.html",
         hitters=hitters, pitchers=pitchers_only,
-        year=year,
+        year=year, available_years=available_years,
     )
 
 
