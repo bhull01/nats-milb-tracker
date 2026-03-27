@@ -99,6 +99,9 @@ PG_SCHEMA = [
     "CREATE INDEX IF NOT EXISTS idx_hitting_date ON hitting_lines(date)",
     "CREATE INDEX IF NOT EXISTS idx_pitching_player ON pitching_lines(player_name)",
     "CREATE INDEX IF NOT EXISTS idx_pitching_date ON pitching_lines(date)",
+    "CREATE INDEX IF NOT EXISTS idx_hitting_player_date ON hitting_lines(player_name, date)",
+    "CREATE INDEX IF NOT EXISTS idx_pitching_player_date ON pitching_lines(player_name, date)",
+    "CREATE INDEX IF NOT EXISTS idx_games_date_level ON games(date, level)",
 ]
 
 SQLITE_SCHEMA = """
@@ -164,6 +167,9 @@ CREATE INDEX IF NOT EXISTS idx_hitting_player ON hitting_lines(player_name);
 CREATE INDEX IF NOT EXISTS idx_hitting_date ON hitting_lines(date);
 CREATE INDEX IF NOT EXISTS idx_pitching_player ON pitching_lines(player_name);
 CREATE INDEX IF NOT EXISTS idx_pitching_date ON pitching_lines(date);
+CREATE INDEX IF NOT EXISTS idx_hitting_player_date ON hitting_lines(player_name, date);
+CREATE INDEX IF NOT EXISTS idx_pitching_player_date ON pitching_lines(player_name, date);
+CREATE INDEX IF NOT EXISTS idx_games_date_level ON games(date, level);
 """
 
 
