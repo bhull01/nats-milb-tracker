@@ -646,6 +646,141 @@ def last_n_games_pitching(conn: Connection, player_name: str,
     return d
 
 
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#  BULK QUERIES – season page (one query per stat type instead of per-player)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+def _compute_hit_derived(d: dict) -> dict:
+    """Add avg/obp/slg/ops to a hitting totals dict."""
+    d["avg"] = round(d["h"] / d["ab"], 3) if d["ab"] else 0
+    d["obp"] = round((d["h"] + d["bb"]) / (d["ab"] + d["bb"]), 3) if (d["ab"] + d["bb"]) else 0
+    singles = d["h"] - (d.get("doubles") or 0) - (d.get("triples") or 0) - (d["hr"] or 0)
+    d["slg"] = round((singles + 2*(d.get("doubles") or 0) + 3*(d.get("triples") or 0) + 4*(d["hr"] or 0)) / d["ab"], 3) if d["ab"] else 0
+    d["ops"] = round(d["obp"] + d["slg"], 3)
+    return d
+
+
+def _compute_pitch_derived(d: dict) -> dict:
+    """Add era/whip/k_per_9/fip to a pitching totals dict."""
+    d["era"] = round(d["er"] * 9 / d["ip"], 2) if d["ip"] else 0
+    d["whip"] = round((d["bb"] + d["h"]) / d["ip"], 2) if d["ip"] else 0
+    d["k_per_9"] = round(d["k"] * 9 / d["ip"], 1) if d["ip"] else 0
+    d["k9"] = d["k_per_9"]
+    d["fip"] = round((13 * (d["hr"] or 0) + 3 * d["bb"] - 2 * d["k"]) / d["ip"] + 3.10, 2) if d["ip"] else None
+    return d
+
+
+def bulk_season_hitting(conn: Connection, player_names: list[str],
+                        year: int) -> dict[str, dict]:
+    """Season hitting totals for multiple players in one query. Returns {name: stats}."""
+    if not player_names:
+        return {}
+    placeholders = ", ".join(["%s" if USE_PG else "?"] * len(player_names))
+    rows = conn.execute(
+        _q(f"""
+        SELECT
+            player_name,
+            COUNT(DISTINCT game_pk) as games,
+            SUM(ab) as ab, SUM(r) as r, SUM(h) as h,
+            SUM(doubles) as doubles, SUM(triples) as triples,
+            SUM(hr) as hr, SUM(rbi) as rbi, SUM(bb) as bb,
+            SUM(k) as k, SUM(sb) as sb
+        FROM hitting_lines
+        WHERE player_name IN ({placeholders}) AND date LIKE ?
+        GROUP BY player_name
+        HAVING SUM(ab) > 0
+    """), (*player_names, f"{year}-%")
+    ).fetchall()
+    result = {}
+    for row in rows:
+        d = dict(row)
+        result[d["player_name"]] = _compute_hit_derived(d)
+    return result
+
+
+def bulk_season_pitching(conn: Connection, player_names: list[str],
+                         year: int) -> dict[str, dict]:
+    """Season pitching totals for multiple players in one query. Returns {name: stats}."""
+    if not player_names:
+        return {}
+    placeholders = ", ".join(["%s" if USE_PG else "?"] * len(player_names))
+    rows = conn.execute(
+        _q(f"""
+        SELECT
+            player_name,
+            COUNT(DISTINCT game_pk) as games,
+            SUM(ip) as ip, SUM(h) as h, SUM(r) as r,
+            SUM(er) as er, SUM(bb) as bb, SUM(k) as k, SUM(hr) as hr
+        FROM pitching_lines
+        WHERE player_name IN ({placeholders}) AND date LIKE ?
+        GROUP BY player_name
+        HAVING SUM(ip) > 0
+    """), (*player_names, f"{year}-%")
+    ).fetchall()
+    result = {}
+    for row in rows:
+        d = dict(row)
+        result[d["player_name"]] = _compute_pitch_derived(d)
+    return result
+
+
+def bulk_last_n_hitting(conn: Connection, player_names: list[str],
+                        n: int, year: int) -> dict[str, dict]:
+    """Last N games hitting for multiple players using window functions. Returns {name: stats}."""
+    if not player_names:
+        return {}
+    placeholders = ", ".join(["%s" if USE_PG else "?"] * len(player_names))
+    rows = conn.execute(
+        _q(f"""
+        SELECT player_name,
+            COUNT(*) as games, SUM(ab) as ab, SUM(h) as h, SUM(hr) as hr,
+            SUM(doubles) as doubles, SUM(triples) as triples,
+            SUM(rbi) as rbi, SUM(bb) as bb, SUM(k) as k, SUM(sb) as sb
+        FROM (
+            SELECT *, ROW_NUMBER() OVER (PARTITION BY player_name ORDER BY date DESC) as rn
+            FROM hitting_lines
+            WHERE player_name IN ({placeholders}) AND date LIKE ?
+        ) sub
+        WHERE rn <= ?
+        GROUP BY player_name
+        HAVING SUM(ab) > 0
+    """), (*player_names, f"{year}-%", n)
+    ).fetchall()
+    result = {}
+    for row in rows:
+        d = dict(row)
+        result[d["player_name"]] = _compute_hit_derived(d)
+    return result
+
+
+def bulk_last_n_pitching(conn: Connection, player_names: list[str],
+                         n: int, year: int) -> dict[str, dict]:
+    """Last N games pitching for multiple players using window functions. Returns {name: stats}."""
+    if not player_names:
+        return {}
+    placeholders = ", ".join(["%s" if USE_PG else "?"] * len(player_names))
+    rows = conn.execute(
+        _q(f"""
+        SELECT player_name,
+            COUNT(*) as games, SUM(ip) as ip, SUM(er) as er, SUM(k) as k,
+            SUM(bb) as bb, SUM(h) as h, SUM(hr) as hr
+        FROM (
+            SELECT *, ROW_NUMBER() OVER (PARTITION BY player_name ORDER BY date DESC) as rn
+            FROM pitching_lines
+            WHERE player_name IN ({placeholders}) AND date LIKE ?
+        ) sub
+        WHERE rn <= ?
+        GROUP BY player_name
+        HAVING SUM(ip) > 0
+    """), (*player_names, f"{year}-%", n)
+    ).fetchall()
+    result = {}
+    for row in rows:
+        d = dict(row)
+        result[d["player_name"]] = _compute_pitch_derived(d)
+    return result
+
+
 def player_game_log(conn: Connection, player_name: str,
                     stat_type: str = "hitting", limit: int = 10) -> list[dict]:
     table = "hitting_lines" if stat_type == "hitting" else "pitching_lines"

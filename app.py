@@ -18,6 +18,7 @@ from pathlib import Path
 from datetime import datetime, timedelta
 
 from flask import Flask, render_template, redirect, url_for, abort, request
+from flask_caching import Cache
 
 sys.path.insert(0, str(Path(__file__).parent))
 
@@ -26,6 +27,10 @@ from db import _q
 from config import LEVEL_ORDER, prospect_lookup
 
 app = Flask(__name__)
+cache = Cache(app, config={
+    "CACHE_TYPE": "SimpleCache",
+    "CACHE_DEFAULT_TIMEOUT": 300,  # 5 minutes
+})
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -97,6 +102,7 @@ def index():
 
 
 @app.route("/day/<date>")
+@cache.cached(timeout=300)
 def day_view(date):
     conn = database.get_connection()
     all_dates = database.dates_with_data(conn)
@@ -152,6 +158,7 @@ def day_view(date):
 
 
 @app.route("/season")
+@cache.cached(timeout=300, query_string=True)
 def season_view():
     year = request.args.get("year", type=int)
     conn = database.get_connection()
@@ -161,29 +168,35 @@ def season_view():
         row = conn.execute("SELECT MAX(date) as d FROM games").fetchone()
         year = int(row["d"][:4]) if row and row["d"] else datetime.now().year
 
-    # Use last date of that year in DB as the rolling "as_of" anchor
-    row = conn.execute(
-        _q("SELECT MAX(date) as d FROM games WHERE date LIKE ?"), (f"{year}-%",)
-    ).fetchone()
-    as_of = row["d"] if row and row["d"] else f"{year}-09-30"
-
     prospects = prospect_lookup()
     sorted_prospects = sorted(prospects.values(), key=lambda p: p.get("composite_rank", 99))
+    all_names = [p["name"] for p in sorted_prospects]
+
+    # Bulk queries: 6 queries total instead of ~90+
+    season_hit_map = database.bulk_season_hitting(conn, all_names, year)
+    season_pitch_map = database.bulk_season_pitching(conn, all_names, year)
+    last15_hit_map = database.bulk_last_n_hitting(conn, all_names, 15, year)
+    last30_hit_map = database.bulk_last_n_hitting(conn, all_names, 30, year)
+    last5_pitch_map = database.bulk_last_n_pitching(conn, all_names, 5, year)
+    last15_pitch_map = database.bulk_last_n_pitching(conn, all_names, 15, year)
 
     hitters, pitchers = [], []
     for p in sorted_prospects:
         name = p["name"]
-        season = database.season_hitting_totals(conn, name, year=year)
+        season = season_hit_map.get(name)
         if season:
-            last15 = database.last_n_games_hitting(conn, name, 15, year=year)
-            last30 = database.last_n_games_hitting(conn, name, 30, year=year)
-            hitters.append({"prospect": p, "season": season, "last15": last15, "last30": last30})
-
-        pseason = database.season_pitching_totals(conn, name, year=year)
+            hitters.append({
+                "prospect": p, "season": season,
+                "last15": last15_hit_map.get(name),
+                "last30": last30_hit_map.get(name),
+            })
+        pseason = season_pitch_map.get(name)
         if pseason:
-            last5p = database.last_n_games_pitching(conn, name, 5, year=year)
-            last15p = database.last_n_games_pitching(conn, name, 15, year=year)
-            pitchers.append({"prospect": p, "season": pseason, "last5": last5p, "last15": last15p})
+            pitchers.append({
+                "prospect": p, "season": pseason,
+                "last5": last5_pitch_map.get(name),
+                "last15": last15_pitch_map.get(name),
+            })
 
     # Available years
     years = conn.execute(
@@ -201,6 +214,7 @@ def season_view():
 
 
 @app.route("/players")
+@cache.cached(timeout=300, query_string=True)
 def players_view():
     year = request.args.get("year", type=int)
     conn = database.get_connection()
@@ -269,6 +283,7 @@ def players_view():
 
 
 @app.route("/player/<path:name>")
+@cache.cached(timeout=300)
 def player_view(name):
     conn = database.get_connection()
     prospects = prospect_lookup()
