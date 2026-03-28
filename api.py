@@ -208,6 +208,7 @@ def extract_player_stats(boxscore: dict, team_id: int) -> tuple[list, list]:
                 hitters.append({
                     "player_name": name,
                     "position": pos,
+                    "batting_order": pdata.get("battingOrder", 9999),
                     "ab": bstats.get("atBats", 0),
                     "r": bstats.get("runs", 0),
                     "h": bstats.get("hits", 0),

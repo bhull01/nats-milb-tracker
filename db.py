@@ -55,13 +55,14 @@ PG_SCHEMA = [
         source_org  TEXT DEFAULT NULL
     )""",
     """CREATE TABLE IF NOT EXISTS hitting_lines (
-        id          SERIAL PRIMARY KEY,
-        game_pk     INTEGER NOT NULL REFERENCES games(game_pk),
-        date        TEXT NOT NULL,
-        level       TEXT NOT NULL,
-        player_name TEXT NOT NULL,
-        position    TEXT,
-        ab          INTEGER DEFAULT 0,
+        id             SERIAL PRIMARY KEY,
+        game_pk        INTEGER NOT NULL REFERENCES games(game_pk),
+        date           TEXT NOT NULL,
+        level          TEXT NOT NULL,
+        player_name    TEXT NOT NULL,
+        position       TEXT,
+        batting_order  INTEGER DEFAULT 9999,
+        ab             INTEGER DEFAULT 0,
         r           INTEGER DEFAULT 0,
         h           INTEGER DEFAULT 0,
         doubles     INTEGER DEFAULT 0,
@@ -121,13 +122,14 @@ CREATE TABLE IF NOT EXISTS games (
 );
 
 CREATE TABLE IF NOT EXISTS hitting_lines (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    game_pk     INTEGER NOT NULL REFERENCES games(game_pk),
-    date        TEXT NOT NULL,
-    level       TEXT NOT NULL,
-    player_name TEXT NOT NULL,
-    position    TEXT,
-    ab          INTEGER DEFAULT 0,
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    game_pk        INTEGER NOT NULL REFERENCES games(game_pk),
+    date           TEXT NOT NULL,
+    level          TEXT NOT NULL,
+    player_name    TEXT NOT NULL,
+    position       TEXT,
+    batting_order  INTEGER DEFAULT 9999,
+    ab             INTEGER DEFAULT 0,
     r           INTEGER DEFAULT 0,
     h           INTEGER DEFAULT 0,
     doubles     INTEGER DEFAULT 0,
@@ -255,6 +257,12 @@ def get_connection() -> Connection:
         cur = conn.cursor()
         for stmt in PG_SCHEMA:
             cur.execute(stmt)
+        # Migrations: add columns introduced after initial schema
+        pg_migrations = [
+            "ALTER TABLE hitting_lines ADD COLUMN IF NOT EXISTS batting_order INTEGER DEFAULT 9999",
+        ]
+        for migration in pg_migrations:
+            cur.execute(migration)
         conn.commit()
         cur.close()
         return Connection(pg_conn=conn)
@@ -271,6 +279,7 @@ def get_connection() -> Connection:
             "ALTER TABLE hitting_lines  ADD COLUMN source_org TEXT DEFAULT NULL",
             "ALTER TABLE pitching_lines ADD COLUMN source_org TEXT DEFAULT NULL",
             "ALTER TABLE games          ADD COLUMN source_org TEXT DEFAULT NULL",
+            "ALTER TABLE hitting_lines  ADD COLUMN batting_order INTEGER DEFAULT 9999",
         ]:
             try:
                 conn.execute(migration)
@@ -324,19 +333,21 @@ def upsert_hitting_line(conn: Connection, line: dict):
     if USE_PG:
         conn.execute(f"""
             INSERT INTO hitting_lines
-                (game_pk, date, level, player_name, position,
+                (game_pk, date, level, player_name, position, batting_order,
                  ab, r, h, doubles, triples, hr, rbi, bb, k, sb, e, source_org)
-            VALUES ({_ph(17)})
+            VALUES ({_ph(18)})
             ON CONFLICT (game_pk, player_name) DO UPDATE SET
                 date = EXCLUDED.date, level = EXCLUDED.level,
-                position = EXCLUDED.position, ab = EXCLUDED.ab,
+                position = EXCLUDED.position, batting_order = EXCLUDED.batting_order,
+                ab = EXCLUDED.ab,
                 r = EXCLUDED.r, h = EXCLUDED.h, doubles = EXCLUDED.doubles,
                 triples = EXCLUDED.triples, hr = EXCLUDED.hr, rbi = EXCLUDED.rbi,
                 bb = EXCLUDED.bb, k = EXCLUDED.k, sb = EXCLUDED.sb,
                 e = EXCLUDED.e, source_org = EXCLUDED.source_org
         """, (
             line["game_pk"], line["date"], line["level"], line["player_name"],
-            line["position"], line["ab"], line["r"], line["h"],
+            line["position"], line.get("batting_order", 9999),
+            line["ab"], line["r"], line["h"],
             line["doubles"], line["triples"], line["hr"], line["rbi"],
             line["bb"], line["k"], line["sb"], line.get("e", 0),
             line.get("source_org"),
@@ -344,12 +355,13 @@ def upsert_hitting_line(conn: Connection, line: dict):
     else:
         conn.execute("""
             INSERT OR REPLACE INTO hitting_lines
-                (game_pk, date, level, player_name, position,
+                (game_pk, date, level, player_name, position, batting_order,
                  ab, r, h, doubles, triples, hr, rbi, bb, k, sb, e, source_org)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             line["game_pk"], line["date"], line["level"], line["player_name"],
-            line["position"], line["ab"], line["r"], line["h"],
+            line["position"], line.get("batting_order", 9999),
+            line["ab"], line["r"], line["h"],
             line["doubles"], line["triples"], line["hr"], line["rbi"],
             line["bb"], line["k"], line["sb"], line.get("e", 0),
             line.get("source_org"),
@@ -446,12 +458,12 @@ def hitting_for_game(conn: Connection, game_pk: int,
                      affiliate_only: bool = False) -> list[dict]:
     if affiliate_only:
         rows = conn.execute(
-            _q("SELECT * FROM hitting_lines WHERE game_pk = ? AND source_org IS NULL ORDER BY ab DESC, h DESC"),
+            _q("SELECT * FROM hitting_lines WHERE game_pk = ? AND source_org IS NULL ORDER BY batting_order ASC"),
             (game_pk,),
         ).fetchall()
     else:
         rows = conn.execute(
-            _q("SELECT * FROM hitting_lines WHERE game_pk = ? ORDER BY ab DESC, h DESC"),
+            _q("SELECT * FROM hitting_lines WHERE game_pk = ? ORDER BY batting_order ASC"),
             (game_pk,),
         ).fetchall()
     return [dict(r) for r in rows]
