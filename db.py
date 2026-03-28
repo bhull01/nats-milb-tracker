@@ -83,6 +83,7 @@ PG_SCHEMA = [
         level       TEXT NOT NULL,
         player_name TEXT NOT NULL,
         position    TEXT,
+        pitch_order INTEGER DEFAULT 9999,
         ip          REAL DEFAULT 0,
         h           INTEGER DEFAULT 0,
         r           INTEGER DEFAULT 0,
@@ -151,6 +152,7 @@ CREATE TABLE IF NOT EXISTS pitching_lines (
     level       TEXT NOT NULL,
     player_name TEXT NOT NULL,
     position    TEXT,
+    pitch_order INTEGER DEFAULT 9999,
     ip          REAL DEFAULT 0,
     h           INTEGER DEFAULT 0,
     r           INTEGER DEFAULT 0,
@@ -260,6 +262,7 @@ def get_connection() -> Connection:
         # Migrations: add columns introduced after initial schema
         pg_migrations = [
             "ALTER TABLE hitting_lines ADD COLUMN IF NOT EXISTS batting_order INTEGER DEFAULT 9999",
+            "ALTER TABLE pitching_lines ADD COLUMN IF NOT EXISTS pitch_order INTEGER DEFAULT 9999",
         ]
         for migration in pg_migrations:
             cur.execute(migration)
@@ -280,6 +283,7 @@ def get_connection() -> Connection:
             "ALTER TABLE pitching_lines ADD COLUMN source_org TEXT DEFAULT NULL",
             "ALTER TABLE games          ADD COLUMN source_org TEXT DEFAULT NULL",
             "ALTER TABLE hitting_lines  ADD COLUMN batting_order INTEGER DEFAULT 9999",
+            "ALTER TABLE pitching_lines ADD COLUMN pitch_order  INTEGER DEFAULT 9999",
         ]:
             try:
                 conn.execute(migration)
@@ -373,30 +377,31 @@ def upsert_pitching_line(conn: Connection, line: dict):
     if USE_PG:
         conn.execute(f"""
             INSERT INTO pitching_lines
-                (game_pk, date, level, player_name, position,
+                (game_pk, date, level, player_name, position, pitch_order,
                  ip, h, r, er, bb, k, hr, decision, source_org)
-            VALUES ({_ph(14)})
+            VALUES ({_ph(15)})
             ON CONFLICT (game_pk, player_name) DO UPDATE SET
                 date = EXCLUDED.date, level = EXCLUDED.level,
-                position = EXCLUDED.position, ip = EXCLUDED.ip,
+                position = EXCLUDED.position, pitch_order = EXCLUDED.pitch_order,
+                ip = EXCLUDED.ip,
                 h = EXCLUDED.h, r = EXCLUDED.r, er = EXCLUDED.er,
                 bb = EXCLUDED.bb, k = EXCLUDED.k, hr = EXCLUDED.hr,
                 decision = EXCLUDED.decision, source_org = EXCLUDED.source_org
         """, (
             line["game_pk"], line["date"], line["level"], line["player_name"],
-            line["position"], line["ip"], line["h"], line["r"],
+            line["position"], line.get("pitch_order", 9999), line["ip"], line["h"], line["r"],
             line["er"], line["bb"], line["k"], line.get("hr", 0), line["decision"],
             line.get("source_org"),
         ))
     else:
         conn.execute("""
             INSERT OR REPLACE INTO pitching_lines
-                (game_pk, date, level, player_name, position,
+                (game_pk, date, level, player_name, position, pitch_order,
                  ip, h, r, er, bb, k, hr, decision, source_org)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             line["game_pk"], line["date"], line["level"], line["player_name"],
-            line["position"], line["ip"], line["h"], line["r"],
+            line["position"], line.get("pitch_order", 9999), line["ip"], line["h"], line["r"],
             line["er"], line["bb"], line["k"], line.get("hr", 0), line["decision"],
             line.get("source_org"),
         ))
@@ -437,6 +442,15 @@ def update_batting_order(conn: Connection, game_pk: int,
     conn.execute(
         _q("UPDATE hitting_lines SET batting_order = ? WHERE game_pk = ? AND player_name = ?"),
         (batting_order, game_pk, player_name),
+    )
+
+
+def update_pitch_order(conn: Connection, game_pk: int,
+                       player_name: str, pitch_order: int):
+    """Update pitch_order for an existing pitching line."""
+    conn.execute(
+        _q("UPDATE pitching_lines SET pitch_order = ? WHERE game_pk = ? AND player_name = ?"),
+        (pitch_order, game_pk, player_name),
     )
 
 
@@ -490,12 +504,12 @@ def pitching_for_game(conn: Connection, game_pk: int,
                       affiliate_only: bool = False) -> list[dict]:
     if affiliate_only:
         rows = conn.execute(
-            _q("SELECT * FROM pitching_lines WHERE game_pk = ? AND source_org IS NULL ORDER BY ip DESC"),
+            _q("SELECT * FROM pitching_lines WHERE game_pk = ? AND source_org IS NULL ORDER BY pitch_order ASC"),
             (game_pk,),
         ).fetchall()
     else:
         rows = conn.execute(
-            _q("SELECT * FROM pitching_lines WHERE game_pk = ? ORDER BY ip DESC"),
+            _q("SELECT * FROM pitching_lines WHERE game_pk = ? ORDER BY pitch_order ASC"),
             (game_pk,),
         ).fetchall()
     return [dict(r) for r in rows]

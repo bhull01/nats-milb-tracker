@@ -684,12 +684,12 @@ def cmd_backfill_player(args):
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 def cmd_fix_batting_order(args):
-    """Re-fetch boxscores to backfill batting_order for all existing games."""
+    """Re-fetch boxscores to backfill batting_order and pitch_order for all existing games."""
     import time
 
     conn = database.get_connection()
     games = database.all_game_pks_with_team(conn)
-    log.info("Found %d affiliate games to update batting order.", len(games))
+    log.info("Found %d affiliate games to update lineup/pitching order.", len(games))
 
     updated = 0
     skipped = 0
@@ -705,24 +705,39 @@ def cmd_fix_batting_order(args):
             continue
 
         teams = boxscore.get("teams", {})
-        found = 0
+        found_h = 0
+        found_p = 0
         for side in ("home", "away"):
             side_data = teams.get(side, {})
             if side_data.get("team", {}).get("id") != team_id:
                 continue
-            for pid, pdata in side_data.get("players", {}).items():
-                bo = pdata.get("battingOrder")
-                if not bo:
-                    continue
-                name = pdata.get("person", {}).get("fullName", "")
-                if name:
-                    database.update_batting_order(conn, game_pk, name, bo)
-                    found += 1
 
-        if found:
+            # Build pitcher-order lookup from the ordered pitchers array
+            pitcher_order = {
+                pid: idx for idx, pid in enumerate(side_data.get("pitchers", []))
+            }
+
+            for pid, pdata in side_data.get("players", {}).items():
+                name = pdata.get("person", {}).get("fullName", "")
+                player_id = pdata.get("person", {}).get("id")
+                if not name:
+                    continue
+
+                # Batting order
+                bo = pdata.get("battingOrder")
+                if bo:
+                    database.update_batting_order(conn, game_pk, name, bo)
+                    found_h += 1
+
+                # Pitch order
+                if player_id and player_id in pitcher_order:
+                    database.update_pitch_order(conn, game_pk, name, pitcher_order[player_id])
+                    found_p += 1
+
+        if found_h or found_p:
             updated += 1
-            log.info("  [%d/%d] Game %d: updated %d hitters.",
-                     i, len(games), game_pk, found)
+            log.info("  [%d/%d] Game %d: %d hitters, %d pitchers ordered.",
+                     i, len(games), game_pk, found_h, found_p)
         else:
             skipped += 1
 

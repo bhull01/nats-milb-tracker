@@ -188,6 +188,9 @@ def extract_player_stats(boxscore: dict, team_id: int) -> tuple[list, list]:
     """
     From a boxscore, pull hitter and pitcher lines for our team.
     Returns (hitters: list[dict], pitchers: list[dict]).
+
+    Hitters are ordered by battingOrder (lineup slot).
+    Pitchers are ordered by the ``pitchers`` array (game appearance order).
     """
     hitters, pitchers = [], []
     teams = boxscore.get("teams", {})
@@ -197,8 +200,14 @@ def extract_player_stats(boxscore: dict, team_id: int) -> tuple[list, list]:
         if side_data.get("team", {}).get("id") != team_id:
             continue
 
+        # Build pitcher-order lookup from the ordered pitchers array
+        pitcher_order = {
+            pid: idx for idx, pid in enumerate(side_data.get("pitchers", []))
+        }
+
         for pid, pdata in side_data.get("players", {}).items():
             name = pdata.get("person", {}).get("fullName", "Unknown")
+            player_id = pdata.get("person", {}).get("id")
             pos = pdata.get("position", {}).get("abbreviation", "")
 
             # Hitting
@@ -229,6 +238,7 @@ def extract_player_stats(boxscore: dict, team_id: int) -> tuple[list, list]:
                 pitchers.append({
                     "player_name": name,
                     "position": pos,
+                    "pitch_order": pitcher_order.get(player_id, 9999),
                     "ip": _parse_ip(ip_str),
                     "ip_display": ip_str,
                     "h": pstats.get("hits", 0),
