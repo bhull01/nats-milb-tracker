@@ -1,114 +1,113 @@
 # Washington Nationals Minor League Tracker
 
-Track daily box scores, season stats, and trends for all Nationals minor
-league affiliates with special focus on top 30 prospects.
+A Flask web app that pulls daily box scores, season stats, and trends for
+all Nationals minor league affiliates from the MLB Stats API, stores
+everything in PostgreSQL, and highlights top 30 prospects. Hosted on
+Railway with a cron job that checks for new game data every 10 minutes.
+
+**Live site:** Hosted on Railway (Flask + Gunicorn)
 
 ## Architecture
 
 ```
-nats_tracker.py     CLI entry point (fetch / dashboard / season / backfill / info)
+app.py              Flask web app (routes, caching, template filters)
+nats_tracker.py     CLI entry point (fetch / backfill / season / info)
+api.py              MLB Stats API client (schedules, box scores, game logs)
+db.py               Database layer (PostgreSQL + SQLite fallback, schema, queries)
 config.py           Affiliate config, DB paths, prospect loader
-api.py              MLB Stats API client
-db.py               SQLite schema, inserts, and aggregation queries
-dashboard.py        HTML dashboard generator
+dashboard.py        Static HTML dashboard generator (legacy)
 prospects.json      Editable prospect list with MLB / FanGraphs / BA rankings
-data/
-  nats_milb.db      SQLite database (auto-created)
-  nats_dashboard.html   Latest dashboard (single file, always overwritten)
-```
-
-## Quick Start
-
-```bash
-pip install -r requirements.txt
-
-# Fetch yesterday's data (auto-generates dashboard)
-python3 nats_tracker.py fetch
-
-# Fetch a specific date
-python3 nats_tracker.py fetch 2026-04-15
-
-# Backfill a date range (e.g., opening week)
-python3 nats_tracker.py backfill 2026-04-01 2026-04-15
-
-# Re-generate dashboard for any stored date
-python3 nats_tracker.py dashboard 2026-04-10
-
-# Export season CSV stats
-python3 nats_tracker.py season
-
-# Show DB info and records
-python3 nats_tracker.py info
+templates/          Jinja2 templates (day, season, players, player profile)
 ```
 
 ## How It Works
 
-**`fetch`** queries the MLB Stats API for each affiliate's schedule on the
-target date, pulls full box scores for completed games, and stores
-everything in `data/nats_milb.db`. It auto-generates a dashboard
-afterwards (skip with `--no-dashboard`).
+1. **Data ingestion** — A Railway cron job runs `python nats_tracker.py fetch`
+   every 10 minutes, pulling schedules and box scores from the free MLB Stats
+   API for each Nationals affiliate and upserting results into PostgreSQL.
+2. **Web dashboard** — Flask serves the data with five main views:
+   - `/day/<date>` — game results, full box scores, key performers
+   - `/season` — season-to-date prospect stats (OPS, WHIP, K/9)
+   - `/players` — all hitters and pitchers aggregated by year
+   - `/player/<name>` — individual game log with 7/15-day rolling trends
+3. **Caching** — Responses are cached in-memory with a 5-minute TTL to keep
+   page loads fast.
 
-**`dashboard`** reads from the SQLite DB — not from the API — so it's
-instant and works offline. The HTML includes:
+## Deployment (Railway)
 
-- Game results per affiliate with W-L records
-- Full hitter and pitcher stat lines (prospects highlighted in gold)
-- Key Performers section ranked by a weighted performance score
-- Season-to-date prospect tracker with OPS, WHIP, K/9
-- 7-day and 15-day rolling trends with hot/cold arrows
-- Date navigation (prev / next)
+The app runs on Railway with two services:
 
-**`backfill`** is just `fetch` in a loop — great for catching up or
-starting fresh mid-season.
+- **Web** — `gunicorn app:app --bind 0.0.0.0:$PORT` (see `Procfile`)
+- **Cron** — Runs `python nats_tracker.py fetch --today` every 10 minutes to
+  pick up completed games throughout the evening
 
-**`season`** exports a CSV of season-to-date prospect stats that opens
-cleanly in Excel.
+**Key environment variables:**
 
-## Prospect Rankings (MLB / FanGraphs / BA)
+| Variable | Purpose |
+|---|---|
+| `DATABASE_URL` | PostgreSQL connection string (provided by Railway Postgres plugin) |
+| `PORT` | Dynamic port for the web service (set by Railway) |
+| `NATS_DATA_DIR` | Override data directory (default: `./data`) |
 
-Rankings from all three sources are stored in `prospects.json`. In the
-dashboard, each prospect shows three color-coded rank pips:
+**Config files:**
 
-- Red = MLB Pipeline
-- Green = FanGraphs
-- Navy = Baseball America
+- `Procfile` — Gunicorn web process
+- `railway.toml` — Nixpacks builder
+- `runtime.txt` — Python 3.12.x
 
-### Updating the Prospect List
+## Database
 
-Option A — **Interactive helper:**
+PostgreSQL in production (Railway plugin), with automatic SQLite fallback for
+local development. Three main tables:
+
+- **games** — game results per affiliate per date (W/L, score, level)
+- **hitting_lines** — one row per batter per game (AB, H, HR, RBI, BB, K, SB, …)
+- **pitching_lines** — one row per pitcher per game (IP, H, ER, BB, K, decision, …)
+
+Season aggregates, rolling averages, and bulk queries are computed in SQL.
+Composite indexes on `(player_name, date)` keep queries fast.
+
+## Local Development
+
 ```bash
-python3 nats_tracker.py update-prospects
-```
-This lets you export to CSV, edit in a spreadsheet, and re-import.
+pip install -r requirements.txt
 
-Option B — **Edit `prospects.json` directly.** It's plain JSON.
+# Uses SQLite by default when DATABASE_URL is not set
+python nats_tracker.py fetch            # Fetch yesterday's games
+python nats_tracker.py fetch 2026-04-15 # Fetch a specific date
+python nats_tracker.py backfill 2026-04-01 2026-04-15  # Backfill a range
 
-Option C — **CSV round-trip:** Export with option 1, edit in Excel/Sheets,
-import with option 2.
-
-## Data Storage
-
-All data lives in `data/nats_milb.db` (SQLite). No files pile up — the
-dashboard is always a single HTML file that gets regenerated.
-
-Override the data directory with the `NATS_DATA_DIR` env var:
-```bash
-export NATS_DATA_DIR=~/nats-data
-python3 nats_tracker.py fetch
+# Run the web app locally
+python app.py   # → http://localhost:5000
 ```
 
-## Automation (Optional)
+### CLI Commands
 
-Add a cron job to fetch daily:
-```bash
-# Every morning at 8am, fetch yesterday's games
-0 8 * * * cd /path/to/nats-milb-tracker && python3 nats_tracker.py fetch
-```
+| Command | Description |
+|---|---|
+| `fetch [date]` | Fetch box scores for a date (default: yesterday) |
+| `fetch --today` | Fetch today's games (used by cron) |
+| `backfill <start> <end>` | Fetch a range of dates |
+| `season` | Export season-to-date prospect stats as CSV |
+| `info` | Show DB stats and affiliate information |
+| `update-prospects` | Interactive helper to edit prospect list |
+| `lookup-player <name>` | Find a player's MLB ID |
+| `backfill-player <name>` | Fetch full game log for a prospect |
+
+## Prospect Rankings
+
+Rankings from three sources are stored in `prospects.json` and shown as
+color-coded badges in the UI:
+
+- **Red** — MLB Pipeline
+- **Green** — FanGraphs
+- **Navy** — Baseball America
+
+Edit `prospects.json` directly, or use `python nats_tracker.py update-prospects`
+for a guided CSV round-trip workflow.
 
 ## Data Source
 
 Free MLB Stats API (no auth required):
 - Base: `https://statsapi.mlb.com/api/v1/`
-- Schedule: `/schedule?teamId=XXX&date=YYYY-MM-DD`
-- Box scores: `/game/GAMEPK/boxscore`
-- Teams: `/teams?sportIds=11,12,13,14`
+- Schedule, box scores, game logs, team lookups

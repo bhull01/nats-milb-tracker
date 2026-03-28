@@ -800,6 +800,19 @@ def dates_with_data(conn: Connection) -> list[str]:
     return [r["date"] for r in rows]
 
 
+def dates_with_pending_games(conn: Connection, lookback_days: int = 3) -> list[str]:
+    """Return dates (within the last N days) that have games not yet marked Final.
+
+    Used by the cron to know which recent dates need a re-fetch.
+    """
+    cutoff = (datetime.now() - timedelta(days=lookback_days)).strftime("%Y-%m-%d")
+    rows = conn.execute(
+        _q("SELECT DISTINCT date FROM games WHERE status != 'Final' AND date >= ? ORDER BY date"),
+        (cutoff,),
+    ).fetchall()
+    return [r["date"] for r in rows]
+
+
 def team_record(conn: Connection, level: str,
                 year: int | None = None) -> dict:
     if year is None:

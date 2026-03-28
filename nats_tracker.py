@@ -63,17 +63,9 @@ log = logging.getLogger("nats_milb")
 #  FETCH: pull data from API → store in SQLite
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-def cmd_fetch(args):
-    """Fetch game data for a date and store in DB."""
-    date_str = _resolve_date(args)
-    log.info("=" * 50)
-    log.info("  FETCH: %s", date_str)
-    log.info("=" * 50)
-
-    affiliates = api.resolve_affiliates()
-    team_cache = api.build_team_name_cache()
-    conn = database.get_connection()
-
+def _fetch_date(date_str: str, affiliates: dict, team_cache: dict,
+                conn) -> tuple[int, int, int]:
+    """Fetch game data for a single date. Returns (games, hitters, pitchers) counts."""
     total_games = 0
     total_hitters = 0
     total_pitchers = 0
@@ -143,6 +135,43 @@ def cmd_fetch(args):
                 database.upsert_pitching_line(conn, p)
                 total_pitchers += 1
 
+    return total_games, total_hitters, total_pitchers
+
+
+def cmd_fetch(args):
+    """Fetch game data for a date and store in DB."""
+    date_str = _resolve_date(args)
+
+    affiliates = api.resolve_affiliates()
+    team_cache = api.build_team_name_cache()
+    conn = database.get_connection()
+
+    # ── Check for recent dates with non-final games that need a re-fetch ─
+    pending_dates = database.dates_with_pending_games(conn, lookback_days=3)
+    # Remove today's date if present (we'll fetch it as the primary date)
+    dates_to_fetch = [d for d in pending_dates if d != date_str]
+    if dates_to_fetch:
+        log.info("Found %d past date(s) with pending games: %s",
+                 len(dates_to_fetch), ", ".join(dates_to_fetch))
+
+    # Always include the primary requested date
+    dates_to_fetch.append(date_str)
+
+    grand_games = 0
+    grand_hitters = 0
+    grand_pitchers = 0
+
+    for fetch_date in dates_to_fetch:
+        log.info("=" * 50)
+        log.info("  FETCH: %s%s", fetch_date,
+                 " (re-check pending)" if fetch_date != date_str else "")
+        log.info("=" * 50)
+
+        g, h, p = _fetch_date(fetch_date, affiliates, team_cache, conn)
+        grand_games += g
+        grand_hitters += h
+        grand_pitchers += p
+
     # ── Prospects on non-Nats teams ──────────────────────────────────
     # Only when --ext-prospects flag is passed (slow; use for backfills).
     # During regular daily fetches, all tracked prospects are on Nats
@@ -152,7 +181,7 @@ def cmd_fetch(args):
         conn.commit()
         conn.close()
         log.info("Stored: %d games, %d hitting lines, %d pitching lines",
-                 total_games, total_hitters, total_pitchers)
+                 grand_games, grand_hitters, grand_pitchers)
         return
 
     log.info("-" * 50)
@@ -242,8 +271,8 @@ def cmd_fetch(args):
     conn.commit()
     conn.close()
     log.info("Stored: %d games, %d hitting lines, %d pitching lines",
-             total_games, total_hitters + ext_hitters,
-             total_pitchers + ext_pitchers)
+             grand_games, grand_hitters + ext_hitters,
+             grand_pitchers + ext_pitchers)
 
     # Static HTML dashboard generation (legacy, disabled by default)
     # Use --dashboard flag to explicitly generate if needed.
