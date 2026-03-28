@@ -683,6 +683,59 @@ def cmd_backfill_player(args):
 #  INFO: show DB stats
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+def cmd_fix_batting_order(args):
+    """Re-fetch boxscores to backfill batting_order for all existing games."""
+    import time
+
+    conn = database.get_connection()
+    games = database.all_game_pks_with_team(conn)
+    log.info("Found %d affiliate games to update batting order.", len(games))
+
+    updated = 0
+    skipped = 0
+    for i, g in enumerate(games, 1):
+        game_pk = g["game_pk"]
+        team_id = g["team_id"]
+
+        boxscore = api.fetch_boxscore(game_pk)
+        if not boxscore:
+            log.warning("  [%d/%d] Game %d: no boxscore, skipping.",
+                        i, len(games), game_pk)
+            skipped += 1
+            continue
+
+        teams = boxscore.get("teams", {})
+        found = 0
+        for side in ("home", "away"):
+            side_data = teams.get(side, {})
+            if side_data.get("team", {}).get("id") != team_id:
+                continue
+            for pid, pdata in side_data.get("players", {}).items():
+                bo = pdata.get("battingOrder")
+                if not bo:
+                    continue
+                name = pdata.get("person", {}).get("fullName", "")
+                if name:
+                    database.update_batting_order(conn, game_pk, name, bo)
+                    found += 1
+
+        if found:
+            updated += 1
+            log.info("  [%d/%d] Game %d: updated %d hitters.",
+                     i, len(games), game_pk, found)
+        else:
+            skipped += 1
+
+        # Commit every 25 games and be polite to the API
+        if i % 25 == 0:
+            conn.commit()
+            time.sleep(0.5)
+
+    conn.commit()
+    conn.close()
+    log.info("Done. Updated %d games, skipped %d.", updated, skipped)
+
+
 def cmd_info(args):
     """Show database stats and affiliate info."""
     conn = database.get_connection()
@@ -801,6 +854,11 @@ Examples:
     p_bp.add_argument("--dry-run", action="store_true",
                       help="Fetch and log without writing to DB")
     p_bp.set_defaults(func=cmd_backfill_player)
+
+    # fix-batting-order
+    p_fbo = sub.add_parser("fix-batting-order",
+                            help="Backfill batting_order for all existing games")
+    p_fbo.set_defaults(func=cmd_fix_batting_order)
 
     # info
     p_info = sub.add_parser("info", help="Show DB stats")

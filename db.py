@@ -431,6 +431,23 @@ def insert_game_ignore(conn: Connection, game: dict):
         ))
 
 
+def update_batting_order(conn: Connection, game_pk: int,
+                         player_name: str, batting_order: int):
+    """Update batting_order for an existing hitting line."""
+    conn.execute(
+        _q("UPDATE hitting_lines SET batting_order = ? WHERE game_pk = ? AND player_name = ?"),
+        (batting_order, game_pk, player_name),
+    )
+
+
+def all_game_pks_with_team(conn: Connection) -> list[dict]:
+    """Return all (game_pk, team_id) pairs from games table."""
+    rows = conn.execute(
+        "SELECT game_pk, team_id FROM games WHERE source_org IS NULL ORDER BY date"
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  QUERIES – daily view
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
