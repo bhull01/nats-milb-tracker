@@ -106,13 +106,17 @@ def _fetch_date(date_str: str, affiliates: dict, team_cache: dict,
             })
             total_games += 1
 
-            if gi["state"] != "Final":
-                log.info("  Game %d: %s (not final)", game_pk, gi["detail"])
+            if gi["state"] == "Preview":
+                log.info("  Game %d: %s (not started)", game_pk, gi["detail"])
                 continue
 
-            log.info("  Game %d: %s %s vs %s",
-                     game_pk, gi["result"], gi["score_display"],
-                     gi["opponent_short"])
+            if gi["state"] == "Final":
+                log.info("  Game %d: %s %s vs %s",
+                         game_pk, gi["result"], gi["score_display"],
+                         gi["opponent_short"])
+            else:
+                log.info("  Game %d: %s (in progress, fetching live stats)",
+                         game_pk, gi["detail"])
 
             # Fetch box score
             boxscore = api.fetch_boxscore(game_pk)
